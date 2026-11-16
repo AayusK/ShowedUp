@@ -12,6 +12,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { formatEventDetail } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
 import { fetchProfile, shortAddress, type Profile } from "@/lib/profileClient";
+import { useEmbeddedWallet } from "@/lib/embeddedWallet";
 
 // "/profile/me" (and the older "/profile/demo" links) mean "whoever is connected".
 const SELF_ALIASES = new Set(["me", "demo"]);
@@ -20,7 +21,11 @@ const TIERS = [{ n: 1, name: "Showed Up" }, { n: 3, name: "Regular" }, { n: 5, n
 export default function ProfileView({ walletParam }: { walletParam: string }) {
   const { publicKey } = useWallet();
   const { setVisible } = useWalletModal();
-  const connectedWallet = publicKey?.toBase58() ?? null;
+  // "Me" is a connected Phantom wallet, or the wallet that came with an email / Google sign-in.
+  const embedded = useEmbeddedWallet();
+  const connectedWallet = publicKey?.toBase58() ?? embedded.address ?? null;
+  // Still finding out whether the visitor is signed in, or their wallet is being created.
+  const signInPending = embedded.enabled && !publicKey && (!embedded.ready || (embedded.authenticated && !embedded.address));
   const isSelfRoute = SELF_ALIASES.has(walletParam);
   const target = isSelfRoute ? connectedWallet : walletParam;
 
@@ -52,6 +57,12 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
   const shell = (body: ReactNode) => <><SiteHeader view="profile" /><main className="shell">{body}</main><SiteFooter /></>;
   const message = (symbol: string, title: string, text: string, action?: ReactNode) => shell(<div className="center-page"><div className="claim-panel"><div className="large-symbol"><Icon name={symbol} size={32}/></div><h1>{title}</h1><p>{text}</p>{action}</div></div>);
 
+  if (isSelfRoute && !connectedWallet && signInPending) {
+    return message("spark", "One moment…", "Checking whether you’re signed in.");
+  }
+  if (isSelfRoute && !connectedWallet && embedded.enabled) {
+    return message("wallet", "Your presence, collected.", "Sign in to see the events you’ve shown up to.", <><button className="button primary full" style={{marginTop: 25}} onClick={() => embedded.login()}>Sign in <Icon name="arrow" size={17}/></button><p className="claim-name-known" style={{marginTop: 18}}>Have a Phantom wallet? <button type="button" className="text-link" onClick={() => setVisible(true)}>Connect it instead</button></p><Link className="text-link" href="/verify" style={{marginTop: 4}}>Or verify any wallet <Icon name="arrow" size={16}/></Link></>);
+  }
   if (isSelfRoute && !connectedWallet) {
     return message("wallet", "Your presence, collected.", "Connect your wallet to see the events you’ve shown up to.", <><button className="button primary full" style={{marginTop: 25}} onClick={() => setVisible(true)}>Connect wallet <Icon name="wallet" size={17}/></button><Link className="text-link" href="/verify" style={{marginTop: 20}}>Or verify any wallet <Icon name="arrow" size={16}/></Link></>);
   }

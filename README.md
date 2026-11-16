@@ -22,10 +22,13 @@ Product spec: [SPEC.md](SPEC.md). Notes for Claude Code: [CLAUDE.md](CLAUDE.md).
 
 Attendees:
 
-1. Scan the QR with the phone's normal camera app. It opens the claim page inside **Phantom**
-   (or offers to install Phantom).
-2. Tap **Connect wallet** → **Claim attendance** → approve the signature in Phantom. Signing is
-   free and sends nothing; it proves they own the wallet.
+1. Scan the QR with the phone's normal camera app.
+   - With sign-in on (`PRIVY_APP_ID` set): the claim page opens in the phone's browser. Tap
+     **Sign in to claim**, use email or Google, then **Claim attendance**. No app to install; a
+     Solana wallet is created for them behind the scenes. Phantom users can tap **Open in Phantom**.
+   - Without it: the claim page opens inside **Phantom** (or offers to install Phantom).
+2. Phantom users: tap **Connect wallet** → **Claim attendance** → approve the signature in
+   Phantom. Signing is free and sends nothing; it proves they own the wallet.
 3. They see "You showed up." with a link to the transaction. **My attendance** shows their events
    and tier. Anyone can check a wallet at **My attendance → Verify a wallet**.
 

@@ -183,6 +183,9 @@ was tested by the owner before it was committed):**
 - Sign-in without Phantom, part A: the claim page offers "Sign in to claim" (Privy, email /
   Google) with Phantom as the second option. The embedded wallet signs the same claim message,
   so `/api/claim` is unchanged.
+- Sign-in without Phantom, part B: with sign-in on, the check-in QR encodes the plain claim URL
+  (not the Phantom link), the header button reads "Sign in" / "Signed in · abcd…wxyz", and
+  `/profile/me` works for signed-in users. With `PRIVY_APP_ID` unset, all three behave as before.
 - Chosen for the hackathon: Consumer Apps track, Best use of Solana, QuickNode Streams bounty.
 
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's
@@ -201,8 +204,10 @@ Possible next work (ask before starting any of it):
   the server rebuilds the message and verifies it with Node's built-in Ed25519 (JWK).
 - **Network:** devnet for now.
 - **Hosting:** Vercel + Supabase. One club, one shared organizer password.
-- **QR:** encodes Phantom's universal browse link (`https://phantom.com/ul/browse/<url>?ref=<origin>`)
-  so a camera scan opens the claim page inside Phantom.
+- **QR:** with sign-in on (`PRIVY_APP_ID` set), encodes the plain claim URL so a camera scan
+  opens it in the phone's browser (changed Nov 16, owner's OK). Without sign-in it still encodes
+  Phantom's universal browse link (`https://phantom.com/ul/browse/<url>?ref=<origin>`) so the
+  scan opens the claim page inside Phantom.
 - **Code sharing:** a screenshot of the code works for up to about 60 s. Accepted; noted in the README.
 - **Removed** `@solana/wallet-adapter-wallets` (Nov 16).
 - **Sign-in:** Privy for email / Google with an embedded Solana wallet; Phantom stays as an option.

@@ -12,6 +12,7 @@ import { formatDay, formatTime } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
 import { checkPassword, readPassword, savePassword } from "@/lib/organizerSession";
 import { phantomBrowseLink } from "@/lib/phantom";
+import { useEmbeddedWallet } from "@/lib/embeddedWallet";
 import type { EventRecord } from "@/lib/server/events";
 import type { Attendee } from "@/lib/server/members";
 
@@ -21,6 +22,8 @@ const WINDOW_S = 30;
 const ROSTER_POLL_MS = 4000;
 
 export default function CheckinView({ event }: { event: EventRecord | null }) {
+  // With email / Google sign-in on, attendees don't need Phantom, so the QR opens the claim page itself.
+  const signInEnabled = useEmbeddedWallet().enabled;
   const [password, setPassword] = useState<string | null>(null);
   const [checkedSaved, setCheckedSaved] = useState(false);
   const [accessModal, setAccessModal] = useState(false);
@@ -156,13 +159,14 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
   const seconds = expiresAt === null ? WINDOW_S : Math.max(0, Math.ceil((expiresAt - now) / 1000));
   const urgency = seconds <= 5 ? "countdown-urgent" : seconds <= 10 ? "countdown-warning" : "";
   const claimUrl = code && origin ? `${origin}/claim/${event.id}?c=${code}` : "";
-  // Phones scan with the camera, so the QR opens the claim page straight inside Phantom.
-  const qrValue = claimUrl ? phantomBrowseLink(claimUrl, origin) : "";
+  // Phones scan with the camera. With sign-in on, the QR opens the claim page in the phone's
+  // browser (it still offers "Open in Phantom"); without it, straight inside Phantom as before.
+  const qrValue = claimUrl ? (signInEnabled ? claimUrl : phantomBrowseLink(claimUrl, origin)) : "";
 
   return <><SiteHeader view="event" />
   <main className="shell">
     <Link className="back-link" href="/organizer">← All events</Link>
-    <div className="checkin-layout with-roster"><div><Badge>Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>Use your phone camera. It opens in Phantom.</small></span></div><div><b>02</b><span>Connect your wallet<small>Your attendance goes where you go.</small></span></div><div><b>03</b><span>Make it official<small>Tap Claim. Your organizer covers the fees.</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}</div>
+    <div className="checkin-layout with-roster"><div><Badge>Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>Tap Claim. Your organizer covers the fees.</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}</div>
       <div className={`qr-panel${urgency ? " " + urgency : ""}`}><div className="qr-title"><span className="brand mini"><span className="brand-mark">↗</span>ShowedUp</span><span className="quiet-pill">DEVNET</span></div><h2>You’re in the right place.</h2><p>Scan to claim your attendance.</p>
         <div className="qr-wrap">{claimUrl
           ? <QRCodeSVG value={qrValue} size={224} fgColor="#173d2d" level="M" marginSize={1}/>

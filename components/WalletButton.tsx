@@ -4,10 +4,14 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
+import { useEmbeddedWallet } from "@/lib/embeddedWallet";
 
 export function WalletButton() {
   const { connected, publicKey, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
+  // Signed in with email / Google (a wallet created behind the scenes). A connected Phantom wins.
+  const embedded = useEmbeddedWallet();
+  const usingEmbedded = !(connected && publicKey) && !!embedded.address;
   const [balance, setBalance] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,6 +45,33 @@ export function WalletButton() {
     };
   }, [menuOpen]);
 
+  if (usingEmbedded && embedded.address) {
+    // People who signed in never need SOL, so there's no balance here: just "you're signed in".
+    const addr = embedded.address;
+    const short = `${addr.slice(0, 4)}…${addr.slice(-4)}`;
+    return (
+      <div ref={containerRef} className="wallet-button-wrap">
+        <button
+          className="wallet-button"
+          onClick={() => setMenuOpen(o => !o)}
+          aria-label={`Signed in, ${short}`}
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+        >
+          <Icon name="wallet" size={16} />
+          <span>Signed in · {short}</span>
+        </button>
+        {menuOpen && (
+          <div className="wallet-menu" role="menu">
+            <button role="menuitem" onClick={() => { void embedded.logout(); setMenuOpen(false); }}>
+              Sign out
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (connected && publicKey) {
     const addr = publicKey.toBase58();
     const short = `${addr.slice(0, 4)}…${addr.slice(-4)}`;
@@ -65,6 +96,16 @@ export function WalletButton() {
           </div>
         )}
       </div>
+    );
+  }
+
+  if (embedded.enabled) {
+    // Sign-in is the main way in; Phantom is offered on the claim and My attendance pages.
+    return (
+      <button className="wallet-button" onClick={() => embedded.login()} disabled={!embedded.ready} aria-label="Sign in">
+        <Icon name="wallet" size={16} />
+        <span>Sign in</span>
+      </button>
     );
   }
 
