@@ -37,7 +37,7 @@ work either way.
 
 | On-chain (Solana devnet) | Server (Next.js on Vercel) + database (Supabase) |
 |---|---|
-| One Token-2022 mint per event: 0 decimals, **NonTransferable** extension, organizer is mint authority | `events` table: `id, name, starts_at, location, mint` |
+| One Token-2022 mint per event: 0 decimals, **NonTransferable** extension, organizer is mint authority. New events also use the **Metadata** extension: the event name, `date` and `location` are stored in the mint itself. | `events` table: `id, name, starts_at, location, mint` |
 | A claim creates the attendee's token account (if needed) and mints 1 token. The organizer pays. | `claims` table: one row per (event, wallet). Its primary key is the lock that stops double claims across server instances. |
 | Attendance = holding a token from an event's mint. Profiles and attendee counts are read from the chain. | Rotating claim code: `HMAC(EVENT_SECRET, eventId:30s-window)`, 6 characters; the current and previous windows are accepted. Claims require the wallet to sign `ShowedUp claim:<eventId>:<code>:<wallet>`. |
 
@@ -65,7 +65,7 @@ After changing a variable in Vercel, redeploy (Deployments → ⋯ → Redeploy)
 
 ### Keeping the organizer wallet funded
 
-Every new event costs about 0.0015 devnet SOL and every new attendee about 0.002, paid by the
+Every new event costs about 0.003 devnet SOL and every new attendee about 0.002, paid by the
 organizer wallet. When it runs low the app says "The organizer wallet needs devnet SOL". Fund the
 organizer address at https://faucet.solana.com (select **Devnet**). 1 SOL covers hundreds of
 attendees.

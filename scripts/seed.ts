@@ -7,7 +7,7 @@
 // attendance token to the wallet, stopping once the wallet holds `target` events
 // in total (default 4). Safe to run again: it never mints twice to the same wallet
 // and never creates duplicate past events.
-// Cost (organizer pays): about 0.0015 SOL per new event + 0.002 SOL per new token account.
+// Cost (organizer pays): about 0.003 SOL per new event + 0.002 SOL per new token account.
 import { config } from "dotenv";
 
 config({ path: ".env.local" });
@@ -62,7 +62,7 @@ async function main() {
 
     let event = (await readEvents()).find((e) => e.name === past.name && e.date === past.date);
     if (!event) {
-      const { mint } = await createEventMint();
+      const { mint } = await createEventMint(past);
       event = { id: newId(), ...past, mint, createdAt: new Date().toISOString() };
       await addEvent(event);
       console.log(`  created event   ${past.name}  (${explorerLink(mint)})`);

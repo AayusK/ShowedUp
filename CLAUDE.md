@@ -149,7 +149,7 @@ Vercel also has ~13 `SUPABASE_*` / `POSTGRES_*` vars added by a Supabase integra
 doesn't use them.
 
 The organizer wallet (`8BdUdmWv4n1DaQMxfPUbVTTtNDd2NqcJz4r9BWkorexu`) needs devnet SOL: about
-0.0015 SOL per new event and 0.002 SOL per new attendee. The app returns `organizer_unfunded`
+0.003 SOL per new event and 0.002 SOL per new attendee. The app returns `organizer_unfunded`
 when it runs low; I fund it at https://faucet.solana.com. Tell me when a step needs this.
 
 ## 6. What's been built (history) and what's next
@@ -159,6 +159,13 @@ Token-2022 NonTransferable mint), 3 (rotating QR), 4 (claim with Phantom `signMe
 verification), 5 (profile + verify, visible-link styling), 6a (seed script, real on-chain
 counts), 6b (README, tunnel, QR opens in Phantom), then the move to real use: hosted step 1
 (Supabase), 2 (RPC key server-only), 3 (demo-label cleanup), 4 (Vercel), 5 (docs).
+
+**Hackathon week (this repo, `AayusK/ShowedUp`, started Nov 16 from a copy of the app; each step
+was tested by the owner before it was committed):**
+- On-chain badge details, part A: `createEventMint(details)` in `lib/server/mint.ts` adds the
+  Token-2022 MetadataPointer + TokenMetadata extensions, so new events store name, symbol
+  `SHOWEDUP`, `date` and `location` in the mint. Older events have no metadata. Part B
+  (profile/verify reading names from the chain instead of Supabase) is not started.
 
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's
 constraints, progress log) is in [`docs/UI-AUDIT.md`](docs/UI-AUDIT.md). Read it before any UI

@@ -64,7 +64,11 @@ export async function POST(request: Request) {
   let mint: string;
   let signature: string;
   try {
-    ({ mint, signature } = await createEventMint());
+    ({ mint, signature } = await createEventMint({
+      name: cleanName,
+      date,
+      ...(cleanLocation ? { location: cleanLocation } : {}),
+    }));
   } catch (e) {
     if (e instanceof OrganizerUnfundedError) {
       return error("organizer_unfunded", 503, { organizer: e.organizer });
