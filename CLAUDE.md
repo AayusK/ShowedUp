@@ -104,6 +104,11 @@ it's kept only as a backup of the first 5 events.
     prefers `@solana/kit` / web3.js v3 and offers migrations. Use it for concepts, Token-2022,
     security and error lookups only. Don't migrate SDKs or add Kit packages. web3.js 3.x is now
     npm `latest`, so always pin `@solana/web3.js@1` if you ever reinstall it.
+  - **One exception (Nov 16):** `@solana/kit` and `@solana-program/{memo,system,token}` are
+    installed because Privy's Solana support requires them. Our own code must not import them.
+- **Sign-in without a wallet app:** `@privy-io/react-auth` v3 (email / Google; Privy creates a
+  Solana wallet for the user). Only `components/PrivyBridge.tsx` imports Privy; pages use
+  `useEmbeddedWallet()` from `lib/embeddedWallet.ts`. It is off unless `PRIVY_APP_ID` is set.
 - **Database:** `@supabase/supabase-js` v2, used **only on the server** with the secret key.
   Never add a browser Supabase client or public RLS policies without asking.
 - **Hosting:** Vercel project `showedup` (personal account `ojas-deshmukhs-projects`). The Claude
@@ -114,8 +119,8 @@ it's kept only as a backup of the first 5 events.
   (`@stellar/stellar-sdk`, pulled in by `@solana/wallet-adapter-wallets`) runs a Unix-only
   install script (`yarn setup || true`), and that breaks `npm install` on Windows.
   - Phantom registers itself as a Wallet Standard wallet, so `WalletProvider wallets={[]}` is
-    enough. We probably don't need `@solana/wallet-adapter-wallets` at all. **Ask me before
-    removing it** (I chose to keep it for now).
+    enough. `@solana/wallet-adapter-wallets` was removed on Nov 16 with the owner's OK: nothing
+    imported it, and its Trezor dependency pinned `@solana/kit` 2, which blocked Privy.
 
 Commands:
 ```bash
@@ -148,6 +153,15 @@ the client `ConnectionProvider` gets the public devnet URL (`PUBLIC_DEVNET_RPC` 
 Vercel also has ~13 `SUPABASE_*` / `POSTGRES_*` vars added by a Supabase integration. The app
 doesn't use them.
 
+A seventh, optional variable: `PRIVY_APP_ID` turns on email / Google sign-in. It is public by
+design (not a secret); `app/layout.tsx` reads it on the server and passes it down, so it still
+isn't `NEXT_PUBLIC_*`. The server doesn't use `PRIVY_APP_SECRET`.
+
+**This repo's own test setup (`AayusK/ShowedUp`, since Nov 16):** `.env.local` on Aayus's Mac
+points at a separate Supabase project "ShowedUp" (ref `vrzcdxhjmdceaheuynpi`, organization
+"Impact Developers", same three tables, RLS on, no policies) and a separate organizer wallet
+(`Bn38cCVx4BHdZ6Zcx5rqJinMncYcGyqhJeJe3gfvpfce`), so testing never touches the club's live data.
+
 The organizer wallet (`8BdUdmWv4n1DaQMxfPUbVTTtNDd2NqcJz4r9BWkorexu`) needs devnet SOL: about
 0.003 SOL per new event and 0.002 SOL per new attendee. The app returns `organizer_unfunded`
 when it runs low; I fund it at https://faucet.solana.com. Tell me when a step needs this.
@@ -166,6 +180,10 @@ was tested by the owner before it was committed):**
   Token-2022 MetadataPointer + TokenMetadata extensions, so new events store name, symbol
   `SHOWEDUP`, `date` and `location` in the mint. Older events have no metadata. Part B
   (profile/verify reading names from the chain instead of Supabase) is not started.
+- Sign-in without Phantom, part A: the claim page offers "Sign in to claim" (Privy, email /
+  Google) with Phantom as the second option. The embedded wallet signs the same claim message,
+  so `/api/claim` is unchanged.
+- Chosen for the hackathon: Consumer Apps track, Best use of Solana, QuickNode Streams bounty.
 
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's
 constraints, progress log) is in [`docs/UI-AUDIT.md`](docs/UI-AUDIT.md). Read it before any UI
@@ -175,7 +193,6 @@ each finished batch gets a row in its progress log.
 Possible next work (ask before starting any of it):
 - Real perks on the profile page (waiting on me for the content).
 - Live "who's here" list on the check-in page (the `claims` table already has the data).
-- Remove `@solana/wallet-adapter-wallets` (see section 4).
 - Mainnet (would need a new funded organizer key and real-SOL costs; ask first).
 
 ## 7. Decisions made (don't revisit without asking)
@@ -187,7 +204,8 @@ Possible next work (ask before starting any of it):
 - **QR:** encodes Phantom's universal browse link (`https://phantom.com/ul/browse/<url>?ref=<origin>`)
   so a camera scan opens the claim page inside Phantom.
 - **Code sharing:** a screenshot of the code works for up to about 60 s. Accepted; noted in the README.
-- **Kept** `@solana/wallet-adapter-wallets` for now.
+- **Removed** `@solana/wallet-adapter-wallets` (Nov 16).
+- **Sign-in:** Privy for email / Google with an embedded Solana wallet; Phantom stays as an option.
 
 ## 8. Gotchas
 

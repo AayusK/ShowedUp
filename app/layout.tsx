@@ -29,7 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        {/* The Privy app ID is public by design; it's read here on the server and passed down,
+            so no NEXT_PUBLIC_ variable is needed. Without it, sign-in is simply switched off. */}
+        <Providers privyAppId={process.env.PRIVY_APP_ID || undefined}>{children}</Providers>
       </body>
     </html>
   );

@@ -48,7 +48,7 @@ API: `GET/POST /api/events`, `GET /api/events/[id]/code`, `POST /api/claim`,
 
 ## Configuration
 
-Six server-only settings. In production they're in **Vercel → showedup → Settings → Environment
+Six server-only settings, plus one optional public one. In production they're in **Vercel → showedup → Settings → Environment
 Variables**; locally they're in `.env.local` (never commit it). See `.env.example`.
 
 | Variable | What it's for |
@@ -59,8 +59,9 @@ Variables**; locally they're in `.env.local` (never commit it). See `.env.exampl
 | `RPC_URL` | Devnet RPC. Use a free [Helius](https://helius.dev) **devnet** URL; the public endpoint rate-limits. |
 | `SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_SECRET_KEY` | Supabase secret key (`sb_secret_…`, Project Settings → API Keys). |
+| `PRIVY_APP_ID` (optional) | [Privy](https://dashboard.privy.io) app ID. Lets attendees sign in with email or Google instead of Phantom; a Solana wallet is created for them. Not a secret. Leave empty for Phantom-only. |
 
-None of them may start with `NEXT_PUBLIC_`: Next.js would copy them into the browser.
+None of the six may start with `NEXT_PUBLIC_`: Next.js would copy them into the browser.
 After changing a variable in Vercel, redeploy (Deployments → ⋯ → Redeploy) for it to take effect.
 
 ### Keeping the organizer wallet funded
