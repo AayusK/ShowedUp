@@ -156,6 +156,8 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
     return <><SiteHeader view="event" /><main className="shell"><Link className="back-link" href="/organizer">← All events</Link><div className="center-page"><div className="claim-panel"><div className="large-symbol neutral-symbol"><Icon name="calendar" size={32}/></div><h1>We couldn’t find that event.</h1><p>Check the link, or head back to your events.</p><Link className="button primary full" href="/organizer" style={{marginTop: 25}}>All events <Icon name="arrow" size={16}/></Link></div></div></main><SiteFooter /></>;
   }
 
+  // How many of the names were reported by the QuickNode Stream watching Solana (0 = no stream).
+  const streamedCount = roster ? roster.filter((a) => a.source === "stream").length : 0;
   const seconds = expiresAt === null ? WINDOW_S : Math.max(0, Math.ceil((expiresAt - now) / 1000));
   const urgency = seconds <= 5 ? "countdown-urgent" : seconds <= 10 ? "countdown-warning" : "";
   const claimUrl = code && origin ? `${origin}/claim/${event.id}?c=${code}` : "";
@@ -185,6 +187,7 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
           : roster.length === 0
             ? <div className="roster-empty"><Icon name="people" size={22}/><p>Names show up here as people check in.</p></div>
             : <ol className="roster-list">{roster.map((a) => <li key={a.wallet}>{a.name}</li>)}</ol>}</div>
+        {streamedCount > 0 && roster && <small className="qr-disclaimer" style={{margin: "10px 0 12px", padding: "0 24px", textAlign: "center"}}>{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
       </aside></div>
     <div className="token-details"><Icon name="shield" size={17}/><span>Event token<small>{event.name} · Token-2022 · Nontransferable · 0 decimals</small></span><a className="pill-link" href={explorerLink(event.mint)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div>
   </main><SiteFooter />

@@ -201,8 +201,13 @@ was tested by the owner before it was committed):**
   signature (`X-QN-Nonce` + `X-QN-Timestamp` + body, keyed with `QUICKNODE_STREAM_TOKEN`),
   validates every field, keeps only mints from the `events` table and upserts into
   `chain_claims` (SQL in `streams/chain_claims.sql`; signature is the primary key, so repeats
-  are harmless). Code: `lib/server/streamClaims.ts`. Part B (not started): nothing in the UI
-  reads `chain_claims` yet.
+  are harmless). Code: `lib/server/streamClaims.ts`.
+- QuickNode Streams, part B (show it): `eventAttendees` in `lib/server/members.ts` merges
+  `chain_claims` (by the event's mint) with the app's own `claims` rows, one entry per wallet,
+  newest first, each with `source: "stream" | "app"` and a time. Nobody is lost if the stream is
+  paused or the table is missing (the app's record still lists them). The check-in page shows
+  "N of M seen live on Solana · QuickNode Streams" under "Who's here" when N > 0. The live count
+  still comes from the mint's on-chain supply.
 - Chosen for the hackathon: Consumer Apps track, Best use of Solana, QuickNode Streams bounty.
 
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's

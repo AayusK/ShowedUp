@@ -88,6 +88,11 @@ One-time setup:
 4. **Token:** set `QUICKNODE_STREAM_TOKEN` to that token in Vercel (and `.env.local`), then
    redeploy.
 
+What you see: on the check-in page, the "Who's here" list includes everyone the stream has
+reported, plus anyone only the app has recorded so far, and a line under it says how many were
+seen live on Solana. Tokens handed out outside the web app (for example by `npm run seed`) show
+up too. If the stream is paused, the list keeps working from the app's own record.
+
 How it stays safe: QuickNode signs every delivery with the token (HMAC-SHA256), and the endpoint
 rejects anything unsigned. It only stores claims for tokens that belong to one of our events,
 and receiving the same delivery twice changes nothing.
