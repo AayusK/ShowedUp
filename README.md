@@ -64,8 +64,36 @@ Variables**; locally they're in `.env.local` (never commit it). See `.env.exampl
 | `SUPABASE_SECRET_KEY` | Supabase secret key (`sb_secret_…`, Project Settings → API Keys). |
 | `PRIVY_APP_ID` (optional) | [Privy](https://dashboard.privy.io) app ID. Lets attendees sign in with email or Google instead of Phantom; a Solana wallet is created for them. Not a secret. Leave empty for Phantom-only. |
 
-None of the six may start with `NEXT_PUBLIC_`: Next.js would copy them into the browser.
+| `QUICKNODE_STREAM_TOKEN` (optional) | Security token of the QuickNode Stream that sends claims to `/api/streams/claims`. A secret. See "Live claim feed" below. |
+
+None of the secrets may start with `NEXT_PUBLIC_`: Next.js would copy them into the browser.
 After changing a variable in Vercel, redeploy (Deployments → ⋯ → Redeploy) for it to take effect.
+
+### Live claim feed (QuickNode Streams)
+
+A [QuickNode Stream](https://www.quicknode.com/streams) watches every new Solana devnet block
+and tells ShowedUp the moment the organizer wallet hands someone an attendance token. The app
+stores those claims in the `chain_claims` table, so it learns about attendance from the chain
+as it happens instead of asking Solana over and over.
+
+One-time setup:
+
+1. **Table:** in the Supabase SQL editor, run [`streams/chain_claims.sql`](streams/chain_claims.sql).
+2. **Stream:** in QuickNode, create a Stream with network **Solana Devnet**, dataset **Block**,
+   starting at the latest block. In the filter editor, paste
+   [`streams/claims-filter.js`](streams/claims-filter.js) and set `ORGANIZER` at the top to the
+   organizer wallet address.
+3. **Destination:** choose **Webhook** with the URL `https://<your site>/api/streams/claims`.
+   Copy the stream's **security token**.
+4. **Token:** set `QUICKNODE_STREAM_TOKEN` to that token in Vercel (and `.env.local`), then
+   redeploy.
+
+How it stays safe: QuickNode signs every delivery with the token (HMAC-SHA256), and the endpoint
+rejects anything unsigned. It only stores claims for tokens that belong to one of our events,
+and receiving the same delivery twice changes nothing.
+
+QuickNode charges credits for every block the stream reads, whether or not it contains a claim.
+On a free plan, pause the stream when you're not running an event or a demo.
 
 ### Keeping the organizer wallet funded
 

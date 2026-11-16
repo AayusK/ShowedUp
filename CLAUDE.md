@@ -153,7 +153,10 @@ the client `ConnectionProvider` gets the public devnet URL (`PUBLIC_DEVNET_RPC` 
 Vercel also has ~13 `SUPABASE_*` / `POSTGRES_*` vars added by a Supabase integration. The app
 doesn't use them.
 
-A seventh, optional variable: `PRIVY_APP_ID` turns on email / Google sign-in. It is public by
+Also optional and server-only: `QUICKNODE_STREAM_TOKEN`, the security token of the QuickNode
+Stream that posts to `/api/streams/claims` (a secret; without it that endpoint answers 503).
+
+Another optional variable: `PRIVY_APP_ID` turns on email / Google sign-in. It is public by
 design (not a secret); `app/layout.tsx` reads it on the server and passes it down, so it still
 isn't `NEXT_PUBLIC_*`. The server doesn't use `PRIVY_APP_SECRET`.
 
@@ -191,6 +194,15 @@ was tested by the owner before it was committed):**
 - Sign-in without Phantom, part B: with sign-in on, the check-in QR encodes the plain claim URL
   (not the Phantom link), the header button reads "Sign in" / "Signed in · abcd…wxyz", and
   `/profile/me` works for signed-in users. With `PRIVY_APP_ID` unset, all three behave as before.
+- QuickNode Streams, part A (receive and store): `streams/claims-filter.js` runs inside QuickNode
+  on every devnet block (dataset "Block") and keeps transactions where the organizer is the fee
+  payer and a Token-2022 balance went up. It posts `{ claims: [{ signature, mint, owner,
+  blockTime, blockHeight }] }` to `POST /api/streams/claims`, which checks QuickNode's HMAC
+  signature (`X-QN-Nonce` + `X-QN-Timestamp` + body, keyed with `QUICKNODE_STREAM_TOKEN`),
+  validates every field, keeps only mints from the `events` table and upserts into
+  `chain_claims` (SQL in `streams/chain_claims.sql`; signature is the primary key, so repeats
+  are harmless). Code: `lib/server/streamClaims.ts`. Part B (not started): nothing in the UI
+  reads `chain_claims` yet.
 - Chosen for the hackathon: Consumer Apps track, Best use of Solana, QuickNode Streams bounty.
 
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's
