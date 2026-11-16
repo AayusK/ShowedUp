@@ -1,0 +1,42 @@
+[
+  {
+    "id": "qwj64m5s",
+    "name": "Builders Meeting",
+    "date": "2026-11-05T19:00",
+    "location": "UBC Nest, Room 2504",
+    "mint": "8GFAxB487DgRXNuZNkVwFiujudFHMwbY7yvDfjtsw7Yy",
+    "createdAt": "2026-11-05T17:10:56.790Z"
+  },
+  {
+    "id": "2m76csq2",
+    "name": "Fall Kickoff",
+    "date": "2026-10-07T18:00",
+    "location": "UBC Nest",
+    "mint": "8K9zKepWSgY3KwjKjb6XjrfmnP9fSUsU3FvNZu5zi6Y9",
+    "createdAt": "2026-11-05T18:08:32.434Z"
+  },
+  {
+    "id": "xghac8b5",
+    "name": "Welcome Social",
+    "date": "2026-10-14T18:30",
+    "location": "The Commons",
+    "mint": "8CXeXXv4FZ5Vt8jaqs2WSRsx6fTEDU1xsdsoczaXEJD1",
+    "createdAt": "2026-11-05T18:08:34.884Z"
+  },
+  {
+    "id": "8xkr4dx2",
+    "name": "Ship Night",
+    "date": "2026-10-21T19:00",
+    "location": "Innovation Hub",
+    "mint": "cpwtB8c36kavLPLrNw6FsnzPe1EKBkFKM9hPE1d1F8E",
+    "createdAt": "2026-11-05T18:08:40.590Z"
+  },
+  {
+    "id": "p6agmwcf",
+    "name": "Design & Coffee",
+    "date": "2026-10-28T17:30",
+    "location": "The Commons",
+    "mint": "9UYjQzEUkEANKY14ZNpzEya45fcqNDfwDgRk5SJG8n86",
+    "createdAt": "2026-11-05T18:08:46.400Z"
+  }
+]

@@ -1,0 +1,28 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+/build
+
+# env files (never commit secrets); .env.example is the template
+.env*
+!.env.example
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
+.vercel
+
+# local tooling
+.playwright-mcp/
+.claude/settings.local.json
+
+# local working log, not published
+PROMPTS.md
