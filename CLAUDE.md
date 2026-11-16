@@ -208,6 +208,10 @@ was tested by the owner before it was committed):**
   paused or the table is missing (the app's record still lists them). The check-in page shows
   "N of M seen live on Solana · QuickNode Streams" under "Who's here" when N > 0. The live count
   still comes from the mint's on-chain supply.
+- Present mode (UI audit item 16): "Present on a projector" on the check-in page opens a
+  full-screen overlay (`.present*` classes at the end of `globals.css`) with a large QR, the
+  code, a thick countdown bar, a big attendee count and the latest names. It reuses the page's
+  existing state; nothing server-side changed.
 - Chosen for the hackathon: Consumer Apps track, Best use of Solana, QuickNode Streams bounty.
 
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's

@@ -36,6 +36,8 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
   const [origin, setOrigin] = useState("");
   const inFlight = useRef(false);
   const [attendees, setAttendees] = useState<number | null>(null);
+  // Present mode: the same check-in, laid out full screen for a projector.
+  const [presenting, setPresenting] = useState(false);
   const [countBump, setCountBump] = useState(false);
   const prevAttendees = useRef<number | null>(null);
 
@@ -147,10 +149,29 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
   }, [attendees]);
 
   useEffect(() => {
-    const close = (e: KeyboardEvent) => { if (e.key === "Escape") setAccessModal(false); };
+    const close = (e: KeyboardEvent) => { if (e.key === "Escape") { setAccessModal(false); setPresenting(false); } };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, []);
+
+  // Present mode also asks the browser for real full screen. If the browser leaves full screen
+  // (Esc), leave present mode too; if the password prompt needs to show, get out of its way.
+  useEffect(() => {
+    const onChange = () => { if (!document.fullscreenElement) setPresenting(false); };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  useEffect(() => {
+    if (accessModal) setPresenting(false);
+  }, [accessModal]);
+  useEffect(() => {
+    if (!presenting && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  }, [presenting]);
+  const startPresenting = () => {
+    setPresenting(true);
+    // Not every browser (or embedded view) allows full screen; the layout works without it.
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  };
 
   if (!event) {
     return <><SiteHeader view="event" /><main className="shell"><Link className="back-link" href="/organizer">← All events</Link><div className="center-page"><div className="claim-panel"><div className="large-symbol neutral-symbol"><Icon name="calendar" size={32}/></div><h1>We couldn’t find that event.</h1><p>Check the link, or head back to your events.</p><Link className="button primary full" href="/organizer" style={{marginTop: 25}}>All events <Icon name="arrow" size={16}/></Link></div></div></main><SiteFooter /></>;
@@ -168,7 +189,7 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
   return <><SiteHeader view="event" />
   <main className="shell">
     <Link className="back-link" href="/organizer">← All events</Link>
-    <div className="checkin-layout with-roster"><div><Badge>Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>Tap Claim. Your organizer covers the fees.</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}</div>
+    <div className="checkin-layout with-roster"><div><Badge>Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>Tap Claim. Your organizer covers the fees.</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}<button type="button" className="button secondary present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button></div>
       <div className={`qr-panel${urgency ? " " + urgency : ""}`}><div className="qr-title"><span className="brand mini"><span className="brand-mark">↗</span>ShowedUp</span><span className="quiet-pill">DEVNET</span></div><h2>You’re in the right place.</h2><p>Scan to claim your attendance.</p>
         <div className="qr-wrap">{claimUrl
           ? <QRCodeSVG value={qrValue} size={224} fgColor="#173d2d" level="M" marginSize={1}/>
@@ -191,6 +212,24 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
       </aside></div>
     <div className="token-details"><Icon name="shield" size={17}/><span>Event token<small>{event.name} · Token-2022 · Nontransferable · 0 decimals</small></span><a className="pill-link" href={explorerLink(event.mint)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div>
   </main><SiteFooter />
+  {presenting && <div className={`present${urgency ? " " + urgency : ""}`} role="dialog" aria-modal="true" aria-label={`Check-in for ${event.name}, full screen`}>
+    <button type="button" className="present-exit" onClick={() => setPresenting(false)}>Exit <kbd>Esc</kbd></button>
+    <div className="present-qr">
+      <div className="present-qr-box">{claimUrl
+        ? <QRCodeSVG value={qrValue} size={560} fgColor="#173d2d" level="M" marginSize={1}/>
+        : <p>{!checkedSaved || password ? "Loading code…" : "Organizer password needed to show the code."}</p>}</div>
+      <div className="present-code"><span>CODE</span><strong>{code ?? "······"}</strong></div>
+      <div className="present-track"><div style={{width: `${seconds / WINDOW_S * 100}%`}}/></div>
+      <small className="present-refresh">{code ? `New code in ${seconds}s` : "\u00a0"}</small>
+    </div>
+    <div className="present-info">
+      <span className="brand"><span className="brand-mark">↗</span>ShowedUp</span>
+      <h1>{event.name}<span className="green-period">.</span></h1>
+      <p className="present-how">{signInEnabled ? "Scan with your phone camera · Sign in with email or Google · Tap Claim" : "Scan with your phone camera · It opens in Phantom · Tap Claim"}</p>
+      <div className={`present-count${countBump ? " count-bump" : ""}`} aria-live="polite"><strong>{attendees ?? "–"}</strong><span>{attendees === 1 ? "person showed up" : "people showed up"}</span></div>
+      {roster && roster.length > 0 && <ol className="present-names" aria-label="Latest check-ins">{roster.slice(0, 6).map((a) => <li key={a.wallet}>{a.name}</li>)}</ol>}
+    </div>
+  </div>}
   {accessModal && <OrganizerAccessModal initialError={accessError} onClose={() => setAccessModal(false)} onUnlocked={(pw) => { setPassword(pw); setAccessModal(false); setAccessError(""); }} />}
   </>;
 }

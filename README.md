@@ -18,7 +18,8 @@ Product spec: [SPEC.md](SPEC.md). Notes for Claude Code: [CLAUDE.md](CLAUDE.md).
 2. Click **Create event**, enter the organizer password, fill in name, date, time and (optional)
    location. Creating the event takes a few seconds: it creates the event's token on Solana.
 3. Click **Open check-in** on the event. Put that page on the projector: it shows a QR code that
-   changes every 30 seconds and a live "N people showed up" count.
+   changes every 30 seconds and a live "N people showed up" count. Click **Present on a
+   projector** for a full-screen version with a much larger QR code (Esc to leave).
 
 Attendees:
 

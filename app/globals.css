@@ -88,3 +88,32 @@
 .roster-empty{display:grid;place-items:center;gap:10px;padding:34px 24px;text-align:center;color:#94a08a;font-size:12px}.roster-empty p{font-size:12px;color:#94a08a;max-width:200px}
 @media(max-width:1100px){.checkin-layout.with-roster{grid-template-columns:minmax(0,1fr) minmax(0,370px)}.roster-panel{grid-column:1/-1}.roster-body{min-height:0}.roster-list{position:static;max-height:320px}}
 @media(max-width:740px){.checkin-layout.with-roster{grid-template-columns:1fr;gap:28px}.checkin-layout.with-roster h1{font-size:48px}.roster-panel{max-width:420px;width:100%;margin:auto}}
+/* Present mode: the check-in page laid out full screen for a projector (UI audit item 16). */
+.present-open{margin-top:28px}
+.present{position:fixed;inset:0;z-index:30;background:var(--background);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:5vw;align-items:center;padding:6vh 6vw;overflow:auto}
+.present-exit{position:absolute;top:2.4vh;right:2.4vw;display:inline-flex;align-items:center;gap:8px;background:white;border:1px solid #dce1d8;border-radius:25px;padding:9px 15px;font-size:12px;color:#5a665b}
+.present-exit:hover{border-color:var(--green);color:var(--green)}
+.present-exit kbd{font:inherit;font-size:10px;background:#eff1ec;border-radius:5px;padding:3px 6px;color:#8b9189}
+.present-qr{display:flex;flex-direction:column;align-items:center;gap:2.4vh;min-width:0}
+.present-qr-box{background:white;border:1px solid var(--line);border-radius:28px;padding:2.6vh;box-shadow:0 18px 45px #1e371a0a;display:grid;place-items:center;width:min(66vh,42vw);height:min(66vh,42vw)}
+.present-qr-box svg{display:block;width:100%;height:100%}
+.present-qr-box p{font-size:16px;text-align:center;max-width:260px}
+.present-code{display:flex;align-items:baseline;gap:18px;font-size:14px;letter-spacing:3px;color:#9ca591}
+.present-code strong{font-size:clamp(32px,5.6vh,60px);letter-spacing:.28em;color:#173d2d;font-weight:600;line-height:1}
+.present-track{width:min(66vh,42vw);height:12px;border-radius:12px;background:#e6ece0;overflow:hidden}
+.present-track>div{height:100%;background:#96ae83;transition:width 1s linear}
+.present.countdown-warning .present-track>div{background:#c8a040}
+.present.countdown-urgent .present-track>div{background:#c8603a}
+.present-refresh{font-size:clamp(13px,2vh,20px);color:#8c9785}
+.present-info{min-width:0}
+.present-info .brand{font-size:clamp(18px,2.8vh,30px)}
+.present-info h1{font-size:clamp(36px,min(8vh,9vw),96px);line-height:1.04;margin:3vh 0 2.4vh;overflow-wrap:anywhere}
+.present-how{font-size:clamp(15px,2.5vh,26px);line-height:1.6;color:#5a665b;max-width:none}
+.present-count{display:flex;align-items:baseline;gap:18px;margin-top:5vh;transform-origin:left center}
+.present-count strong{font-size:clamp(64px,min(16vh,22vw),190px);font-weight:500;letter-spacing:-.05em;line-height:.9;color:var(--green)}
+.present-count span{font-size:clamp(16px,2.8vh,30px);color:#5a665b}
+.present-count.count-bump{animation:bumpScale .45s ease}
+.present-names{list-style:none;margin:3.5vh 0 0;padding:0;display:flex;flex-wrap:wrap;gap:1.2vh 1vw}
+.present-names li{font-size:clamp(14px,2.3vh,24px);background:#edf2e9;color:#3d5a45;border-radius:40px;padding:.9vh 1.2vw;animation:fadeSlideUp .35s ease backwards;overflow-wrap:anywhere}
+@media(max-width:900px){.present{grid-template-columns:1fr;gap:4vh;padding:9vh 7vw 6vh;align-items:start}.present-qr-box,.present-track{width:min(78vw,56vh)}.present-qr-box{height:min(78vw,56vh)}.present-info{text-align:center}.present-count{justify-content:center;transform-origin:center}.present-names{justify-content:center}}
+@media(prefers-reduced-motion:reduce){.present-count.count-bump,.present-names li{animation:none}}

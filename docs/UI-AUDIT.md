@@ -1,6 +1,6 @@
 # ShowedUp UI/UX polish audit
 
-**Date:** 2026-11-05 · **Status:** audit done, **no items implemented yet** · Waiting for the owner to pick items.
+**Date:** 2026-11-05 · **Status:** audit done; item 16 implemented (see the progress log), the rest waiting for the owner to pick.
 
 This is Phase 1 of the frontend polish request. Phase 2 = implement the items the owner approves,
 3–6 at a time, grouped by page or theme, with lint + typecheck + desktop/mobile screenshots after
@@ -94,4 +94,4 @@ Record each implemented batch here (date, item numbers, commit), so the next ses
 
 | Date | Items | Commit | Notes |
 |---|---|---|---|
-| | | | |
+| 2026-11-16 | 16 | (see git log: "Add full-screen Present mode") | "Present on a projector" button on the check-in page opens a full-screen layout (also asks the browser for real full screen; Esc or Exit leaves). Measured at 1280×720: QR box 475px (66% of height), code 40px, countdown bar 12px, attendee count 115px, latest 6 names, no scrolling. New CSS classes are prefixed `present-`; the normal page is unchanged apart from the button. |
