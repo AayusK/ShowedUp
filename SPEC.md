@@ -22,7 +22,7 @@ The organizer creates an event and a rotating QR code appears. Attendees scan it
 |---|---|
 | One Token-2022 mint per event: decimals 0, NonTransferable, organizer is mint authority. Events created from Nov 16 on also carry Token-2022 metadata in the mint: name, symbol `SHOWEDUP`, `date`, `location` | Event list `{id, name, starts_at, location, mint}` in Supabase (`events` table); per-(event, wallet) claim lock + log in `claims` |
 | Each claim: create the attendee's ATA if needed, then mint 1 token. The organizer pays. | Rotating claim code: `HMAC(EVENT_SECRET, eventId + floor(now/30s))`, 6 chars. The current and previous windows are accepted. |
-| Attendance = token balance > 0 for that event's mint (the source of truth for profiles) | Organizer page gated by the `ORGANIZER_PASSWORD` env var. The organizer key comes from `ORGANIZER_SECRET_KEY`. |
+| Attendance = token balance > 0 for that event's mint (the source of truth for profiles). Profiles read each badge's name and date from the mint and accept only mints whose mint authority is the organizer | Organizer page gated by the `ORGANIZER_PASSWORD` env var. The organizer key comes from `ORGANIZER_SECRET_KEY`. |
 
 API: `POST/GET /api/events`, `GET /api/events/[id]/code`, `POST /api/claim`, `GET /api/profile/[wallet]`.
 

@@ -42,7 +42,7 @@ work either way.
 |---|---|
 | One Token-2022 mint per event: 0 decimals, **NonTransferable** extension, organizer is mint authority. New events also use the **Metadata** extension: the event name, `date` and `location` are stored in the mint itself. | `events` table: `id, name, starts_at, location, mint` |
 | A claim creates the attendee's token account (if needed) and mints 1 token. The organizer pays. | `claims` table: one row per (event, wallet). Its primary key is the lock that stops double claims across server instances. |
-| Attendance = holding a token from an event's mint. Profiles and attendee counts are read from the chain. | Rotating claim code: `HMAC(EVENT_SECRET, eventId:30s-window)`, 6 characters; the current and previous windows are accepted. Claims require the wallet to sign `ShowedUp claim:<eventId>:<code>:<wallet>`. |
+| Attendance = holding a token from an event's mint. Profiles and attendee counts are read from the chain: a profile lists every token the wallet holds that the organizer wallet issued, using the name and date stored in the token. The database is only needed for older events without those details. | Rotating claim code: `HMAC(EVENT_SECRET, eventId:30s-window)`, 6 characters; the current and previous windows are accepted. Claims require the wallet to sign `ShowedUp claim:<eventId>:<code>:<wallet>`. |
 
 The browser never talks to Solana or Supabase directly. Every secret stays on the server.
 

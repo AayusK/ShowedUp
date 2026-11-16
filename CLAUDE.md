@@ -178,8 +178,13 @@ counts), 6b (README, tunnel, QR opens in Phantom), then the move to real use: ho
 was tested by the owner before it was committed):**
 - On-chain badge details, part A: `createEventMint(details)` in `lib/server/mint.ts` adds the
   Token-2022 MetadataPointer + TokenMetadata extensions, so new events store name, symbol
-  `SHOWEDUP`, `date` and `location` in the mint. Older events have no metadata. Part B
-  (profile/verify reading names from the chain instead of Supabase) is not started.
+  `SHOWEDUP`, `date` and `location` in the mint. Older events have no metadata.
+- On-chain badge details, part B: `getProfile` in `lib/server/profile.ts` reads each held token's
+  name, date and location from the mint itself, and only accepts mints whose **mint authority is
+  the organizer wallet** (a look-alike token from anyone else is ignored). The `events` table is
+  a fallback for older events without metadata. If Supabase is unreachable, on-chain badges still
+  show and the response has `partial: true`. Each profile event has `source: "chain" | "database"`
+  (not shown in the UI yet).
 - Sign-in without Phantom, part A: the claim page offers "Sign in to claim" (Privy, email /
   Google) with Phantom as the second option. The embedded wallet signs the same claim message,
   so `/api/claim` is unchanged.

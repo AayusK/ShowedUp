@@ -1,11 +1,14 @@
 // Client-side types + fetcher for GET /api/profile/[wallet].
 
 export interface ProfileEvent {
+  /** The event's id, or its token address for badges our database doesn't list. */
   id: string;
   name: string;
   date: string;
   location?: string;
   mint: string;
+  /** Where the name and date came from: the token itself, or (older events) our database. */
+  source: "chain" | "database";
 }
 
 export interface Profile {
@@ -14,6 +17,8 @@ export interface Profile {
   count: number;
   tier: string | null;
   nextTier: { name: string; min: number; remaining: number } | null;
+  /** Set when the database couldn't be reached: only badges readable from the chain are listed. */
+  partial?: boolean;
 }
 
 export type ProfileResult = { ok: true; profile: Profile } | { ok: false; error: "invalid_wallet" | "rpc_error" | "network" };
