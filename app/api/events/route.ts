@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { authorizeClub } from "@/lib/server/auth";
 import { ClubKeyError, getClubKeypair } from "@/lib/server/clubs";
-import { addEvent, readEvents, type EventRecord } from "@/lib/server/events";
+import { addEvent, readEvents, supportsRoleBadges, type EventRecord } from "@/lib/server/events";
 import { newId } from "@/lib/server/ids";
 import { BadgeTooLargeError, OrganizerUnfundedError, createEventMint } from "@/lib/server/mint";
 import { getAttendeeCounts } from "@/lib/server/counts";
 import { CLUB_ID_RE } from "@/lib/clubs";
+import { CONTRIBUTION_ROLES, type BadgeKind, type Role } from "@/lib/badges";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +38,9 @@ export async function GET(request: Request) {
   return NextResponse.json({ events });
 }
 
-// A club's officer creates an event. Needs that club's passcode; the badge is issued from that
-// club's wallet.
+// A club's officer creates an event (attendance, claimed with the QR code) or a contribution
+// badge (kind "contribution" plus a role, handed out with POST /api/events/[id]/award).
+// Needs that club's passcode; the badge is issued from that club's wallet.
 export async function POST(request: Request) {
   let club;
   try {
@@ -54,7 +56,20 @@ export async function POST(request: Request) {
   } catch {
     return error("invalid_input", 400, { message: "Body must be JSON" });
   }
-  const { name, date, location } = (body ?? {}) as Record<string, unknown>;
+  const { name, date, location, kind: rawKind, role: rawRole } = (body ?? {}) as Record<string, unknown>;
+
+  // Attendance unless the officer is recording a contribution, which needs a role from the fixed list.
+  let kind: BadgeKind = "attendance";
+  let role: Role = "Attendee";
+  if (rawKind === "contribution") {
+    if (typeof rawRole !== "string" || !CONTRIBUTION_ROLES.includes(rawRole as Role)) {
+      return error("invalid_input", 400, { message: "Pick a role for this contribution" });
+    }
+    kind = "contribution";
+    role = rawRole as Role;
+  } else if (rawKind !== undefined && rawKind !== "attendance") {
+    return error("invalid_input", 400, { message: "Unknown badge kind" });
+  }
 
   const cleanName = typeof name === "string" ? name.trim() : "";
   const cleanLocation = typeof location === "string" ? location.trim() : "";
@@ -71,6 +86,8 @@ export async function POST(request: Request) {
   // The id comes first now: the token's address on Solana is derived from it.
   let id: string;
   try {
+    // Check the database can store a contribution badge *before* paying for its token on Solana.
+    if (kind === "contribution" && !(await supportsRoleBadges())) return error("schema_not_ready", 503);
     const existing = new Set((await readEvents()).map((e) => e.id));
     id = newId();
     while (existing.has(id)) id = newId();
@@ -82,7 +99,7 @@ export async function POST(request: Request) {
   let signature: string;
   try {
     ({ mint, signature } = await createEventMint(
-      { id, name: cleanName, date, ...(cleanLocation ? { location: cleanLocation } : {}) },
+      { id, name: cleanName, date, ...(cleanLocation ? { location: cleanLocation } : {}), kind, role, club: club.name },
       getClubKeypair(club),
     ));
   } catch (e) {
@@ -90,7 +107,9 @@ export async function POST(request: Request) {
       return error("organizer_unfunded", 503, { organizer: e.organizer });
     }
     if (e instanceof BadgeTooLargeError) {
-      return error("invalid_input", 400, { message: "The name and location are too long to store on Solana. Shorten them (emoji count for several characters)." });
+      return error("invalid_input", 400, { message: kind === "contribution"
+        ? "The title is too long to store on Solana. Shorten it (emoji count for several characters)."
+        : "The name and location are too long to store on Solana. Shorten them (emoji count for several characters)." });
     }
     if (e instanceof ClubKeyError) return error("club_key_not_configured", 500);
     if (e instanceof Error && /ORGANIZER_SECRET_KEY|SUPABASE_/.test(e.message)) {
@@ -108,6 +127,7 @@ export async function POST(request: Request) {
     mint,
     createdAt: new Date().toISOString(),
     ...(club.legacy ? {} : { clubId: club.id }),
+    ...(kind === "contribution" ? { kind, role } : {}),
   };
   try {
     await addEvent(event);

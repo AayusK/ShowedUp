@@ -16,6 +16,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const event = await getEvent(id);
     if (!event) return NextResponse.json({ error: "not_found" }, { status: 404 });
     if (!ownsEvent(club, event)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    // Contribution badges are awarded by an officer; they have no QR code to scan.
+    if (event.kind === "contribution") return NextResponse.json({ error: "not_checkin_event" }, { status: 400 });
     return NextResponse.json(currentCode(event.id), { headers: { "cache-control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "code_not_configured" }, { status: 500 });

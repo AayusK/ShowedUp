@@ -1,5 +1,6 @@
 // Client-side types + fetcher for GET /api/profile/[wallet].
 import type { ClubInfo } from "@/lib/clubs";
+import type { BadgeKind, Role } from "@/lib/badges";
 
 export interface ProfileEvent {
   /** The event's id, or its token address for badges our database doesn't list. */
@@ -12,6 +13,10 @@ export interface ProfileEvent {
   source: "chain" | "database";
   /** The verified club that issued this badge, worked out from the token's issuer on-chain. */
   club: ClubInfo;
+  /** "attendance" (claimed with the QR code) or "contribution" (awarded by an officer). */
+  kind: BadgeKind;
+  /** What they did. Always "Attendee" for attendance badges. Read from the token. */
+  role: Role;
 }
 
 /**
@@ -24,6 +29,8 @@ export interface UnverifiedBadge {
   /** The address that controls this token (its mint authority), or null if nobody does. */
   issuer: string | null;
   date: string;
+  /** The role the token claims, from the fixed list. */
+  role: Role;
   /** A registered club this token is from or names. Being named proves nothing by itself. */
   club: string | null;
   /**
@@ -40,6 +47,8 @@ export interface Profile {
   events: ProfileEvent[];
   /** How many verified attendance badges; the perk tiers count these. */
   count: number;
+  /** How many verified contribution badges (Mentor, Speaker, ...). */
+  contributions: number;
   tier: string | null;
   nextTier: { name: string; min: number; remaining: number } | null;
   /** Look-alike or not-yet-verified tokens (at most 20 are listed). Never counted. */

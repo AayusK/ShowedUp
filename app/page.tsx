@@ -11,5 +11,6 @@ export default async function Home() {
     // The home page still renders (without the events section) if the database is unreachable.
     console.error("[home] could not load events:", e instanceof Error ? e.message : "unknown");
   }
-  return <HomeView events={events.map(({ id, name, date, location, mint }) => ({ id, name, date, location, mint }))} />;
+  // Contribution badges aren't events people can come to: the home page lists attendance only.
+  return <HomeView events={events.filter((e) => e.kind !== "contribution").map(({ id, name, date, location, mint }) => ({ id, name, date, location, mint }))} />;
 }

@@ -26,6 +26,7 @@ import {
   type TokenMetadata,
 } from "@solana/spl-token-metadata";
 import { PUBLIC_DEVNET_RPC } from "@/lib/solana";
+import type { BadgeKind, Role } from "@/lib/badges";
 import { getOrganizerKeypair } from "./organizer";
 
 // Rough per-transaction fee buffer on top of the mint account's rent.
@@ -78,6 +79,12 @@ export interface EventMintDetails {
   /** Local wall-clock time "YYYY-MM-DDTHH:mm", as the organizer entered it. */
   date: string;
   location?: string;
+  /** "attendance" (claimed with the QR code) or "contribution" (awarded by an officer). */
+  kind: BadgeKind;
+  /** What the badge says the holder did: Attendee, Volunteer, Speaker, Mentor, Organizer or Officer. */
+  role: Role;
+  /** The issuing club's name. Club names on-chain are fine; a student's name never goes here. */
+  club: string;
 }
 
 /** Ticker shown next to the event name in wallets and explorers. */
@@ -94,11 +101,14 @@ export function badgeMintAddress(issuer: PublicKey, id: string): Promise<PublicK
   return PublicKey.createWithSeed(issuer, id, TOKEN_2022_PROGRAM_ID);
 }
 
-/** The metadata stored inside the mint account: event name plus `date` / `location` / `id` fields. */
+/**
+ * The metadata stored inside the mint account: the badge's name plus `date`, `location`, `id`,
+ * `kind`, `role` and `club` fields. Nothing here identifies the student who receives it.
+ */
 export function eventTokenMetadata(mint: PublicKey, authority: PublicKey, details: EventMintDetails): TokenMetadata {
   const additionalMetadata: [string, string][] = [["date", details.date]];
   if (details.location) additionalMetadata.push(["location", details.location]);
-  additionalMetadata.push(["id", details.id]);
+  additionalMetadata.push(["id", details.id], ["kind", details.kind], ["role", details.role], ["club", details.club]);
   return {
     updateAuthority: authority,
     mint,
@@ -165,7 +175,7 @@ export function buildEventMintInstructions(
       symbol: metadata.symbol,
       uri: metadata.uri,
     }),
-    // 7. Add the extra fields (date, location, id).
+    // 7. Add the extra fields (date, location, id, kind, role, club).
     ...metadata.additionalMetadata.map(([field, value]) =>
       createUpdateFieldInstruction({
         programId: TOKEN_2022_PROGRAM_ID,
@@ -183,8 +193,8 @@ export function buildEventMintInstructions(
  *  - its address is derived from the club's wallet, which proves the club created it
  *  - NonTransferable extension (tokens can't be sent on = "soulbound")
  *  - Permanent Delegate extension: the club can burn a badge it issued by mistake
- *  - Metadata extension: the event's name, date and location are stored in the mint itself,
- *    so anyone can read what a badge is for without asking our database
+ *  - Metadata extension: the badge's name, date, location, kind, role and club are stored in
+ *    the mint itself, so anyone can read what a badge is for without asking our database
  *  - 0 decimals (you either attended or you didn't)
  *  - the club is the mint authority; no freeze authority
  * The organizer wallet pays the rent for the new mint account and the fee, so clubs never need

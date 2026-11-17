@@ -18,6 +18,35 @@ export async function saveMemberName(wallet: string, name: string): Promise<void
   if (error) throw new Error(`member save failed: ${error.message}`);
 }
 
+/**
+ * Everyone who has checked in to any of this club's events (or been awarded one of its badges),
+ * with their saved name, sorted by name. This is the list an officer picks from when awarding a
+ * contribution. Names are only ever sent to that club's officers.
+ */
+export async function clubMembers(allEvents: Pick<EventRecord, "id" | "mint" | "kind">[]): Promise<{ wallet: string; name: string }[]> {
+  // Only check-ins count. Being awarded a badge by address doesn't make someone a member, so it
+  // never shows a club their saved name.
+  const events = allEvents.filter((e) => e.kind !== "contribution");
+  if (events.length === 0) return [];
+  const [recorded, streamed] = await Promise.all([
+    db().from("claims").select("wallet").in("event_id", events.map((e) => e.id)).eq("status", "confirmed"),
+    db().from("chain_claims").select("wallet").in("mint", events.map((e) => e.mint)),
+  ]);
+  if (recorded.error) throw new Error(`member read failed: ${recorded.error.message}`);
+  const wallets = [...new Set([
+    ...(recorded.data ?? []).map((r) => r.wallet as string),
+    ...(streamed.error ? [] : (streamed.data ?? [])).map((r) => r.wallet as string),
+  ])].slice(0, 1000);
+  if (wallets.length === 0) return [];
+
+  const { data: members, error } = await db().from("members").select("wallet, name").in("wallet", wallets);
+  if (error) throw new Error(`member read failed: ${error.message}`);
+  const names = new Map((members ?? []).map((m) => [m.wallet as string, m.name as string]));
+  return wallets
+    .map((wallet) => ({ wallet, name: names.get(wallet) ?? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export interface Attendee {
   wallet: string;
   /** The saved name, or a shortened wallet for people who claimed before names existed. */

@@ -6,6 +6,7 @@ import { readEvents, type EventRecord } from "./events";
 import { BADGE_SYMBOL, badgeMintAddress, getConnection, withRetry } from "./mint";
 import { clubInfo, legacyClub, readClubs, type ClubRecord } from "./clubs";
 import { CLUB_ID_RE, LEGACY_CLUB_ID } from "@/lib/clubs";
+import { readKindAndRole, type BadgeKind, type Role } from "@/lib/badges";
 import { getNextTier, getTier } from "@/lib/tiers";
 import type { Profile, ProfileEvent, UnverifiedBadge } from "@/lib/profileClient";
 
@@ -27,6 +28,11 @@ export interface MintFacts {
   location?: string;
   /** The badge id written into the token; the token's address is derived from it. */
   id?: string;
+  /** Tokens from before role badges carry neither field and read as attendance / Attendee. */
+  kind: BadgeKind;
+  role: Role;
+  /** The club name the token carries. Only a claim: the issuer's address is what gets checked. */
+  clubName?: string;
 }
 
 /**
@@ -47,6 +53,7 @@ export function readMintFacts(mint: PublicKey, info: AccountInfo<Buffer> | null)
     if (!metadata.name || !date || !DATE_RE.test(date)) return null;
     const location = fields.get("location");
     const id = fields.get("id");
+    const clubName = fields.get("club");
     return {
       authority: parsed.mintAuthority?.toBase58() ?? null,
       symbol: metadata.symbol,
@@ -54,6 +61,8 @@ export function readMintFacts(mint: PublicKey, info: AccountInfo<Buffer> | null)
       date,
       ...(location ? { location } : {}),
       ...(id && CLUB_ID_RE.test(id) ? { id } : {}),
+      ...readKindAndRole(fields.get("kind"), fields.get("role")),
+      ...(clubName ? { clubName } : {}),
     };
   } catch {
     return null; // not a mint, or data we don't understand: leave it out rather than guess
@@ -153,6 +162,8 @@ export async function getProfile(owner: PublicKey): Promise<Profile> {
     });
   }
 
+  // A look-alike token may name a club. We only repeat that name if it is a registered club's.
+  const clubNames = new Map(clubs.map((c) => [c.name.toLowerCase(), c.name]));
   const attended: ProfileEvent[] = [];
   const unverified: UnverifiedBadge[] = [];
   for (const mint of heldMints) {
@@ -170,13 +181,22 @@ export async function getProfile(owner: PublicKey): Promise<Profile> {
           mint,
           source: "chain",
           club: clubInfo(verdict.club),
+          kind: badge.kind,
+          role: badge.role,
         });
-      } else if (verdict.status === "unverified" && verdict.club?.legacy && dbEvents === null) {
-        // The database is down, so we can't tell whether this is one of the default club's older
-        // badges (they are confirmed against the events table). Leave it out rather than call it
-        // a look-alike; `partial` tells the page some badges may be missing.
+      } else if (verdict.status === "unverified" && (dbClubs === null || (verdict.club?.legacy && dbEvents === null))) {
+        // Part of the database is down, so we can't tell a real badge from a look-alike (we
+        // don't know every club, or can't confirm the default club's older badges). Leave it
+        // out rather than call a real badge a copy; `partial` tells the page some may be missing.
       } else if (verdict.status === "unverified") {
-        unverified.push({ mint, issuer: badge.authority, date: badge.date, club: verdict.club?.name ?? null, reason: verdict.reason });
+        unverified.push({
+          mint,
+          issuer: badge.authority,
+          date: badge.date,
+          role: badge.role,
+          club: verdict.club?.name ?? clubNames.get(badge.clubName?.toLowerCase() ?? "") ?? null,
+          reason: verdict.reason,
+        });
       }
     } else if (row && (row.clubId ?? LEGACY_CLUB_ID) === LEGACY_CLUB_ID) {
       // An older event: its token carries no details, so they come from our database.
@@ -188,18 +208,22 @@ export async function getProfile(owner: PublicKey): Promise<Profile> {
         mint,
         source: "database",
         club: clubInfo(legacy),
+        kind: "attendance",
+        role: "Attendee",
       });
     }
   }
   attended.sort((a, b) => b.date.localeCompare(a.date));
   unverified.sort((a, b) => b.date.localeCompare(a.date));
 
-  const count = attended.length;
+  // Tiers count attendance only; contributions are counted separately.
+  const count = attended.filter((e) => e.kind === "attendance").length;
   const next = getNextTier(count);
   return {
     wallet: owner.toBase58(),
     events: attended,
     count,
+    contributions: attended.length - count,
     tier: getTier(count)?.name ?? null,
     nextTier: next ? { name: next.name, min: next.min, remaining: next.min - count } : null,
     unverified: unverified.slice(0, MAX_UNVERIFIED),

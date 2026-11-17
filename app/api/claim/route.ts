@@ -45,7 +45,8 @@ export async function POST(request: Request) {
   } catch {
     return error("server_not_configured", 500);
   }
-  if (!event) return error("not_found", 404);
+  // Contribution badges can only be awarded by the club's officers, never claimed.
+  if (!event || event.kind === "contribution") return error("not_found", 404);
   const normalizedCode = code.trim().toUpperCase();
   try {
     if (!isValidCode(event.id, normalizedCode)) return NextResponse.json({ status: "expired" });

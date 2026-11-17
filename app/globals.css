@@ -129,3 +129,26 @@
 .clubs-heading~.form-error{margin-bottom:40px}
 .clubs-heading+.event-list{margin-bottom:65px}
 @media(max-width:740px){.club-row .pill-link{margin-left:0}.clubs-heading+.event-list{margin-bottom:40px}}
+
+/* ===== Track record · Step 2: role badges ("Award contribution") ===== */
+.heading-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.heading-actions .button{margin-left:0}
+.award-modal{max-width:520px;max-height:calc(100vh - 48px);overflow-y:auto}
+.field textarea{padding:12px;border:1px solid #dfe5d8;background:white;border-radius:9px;color:#455b3b;min-width:0;font:inherit;font-size:12px;width:100%;resize:vertical}
+.field>small{font-size:10px;color:#9ea893;line-height:1.6}
+.award-pick>span{font-size:10px;color:#7f8d73}
+.award-list{max-height:170px;overflow-y:auto;border:1px solid #dfe5d8;background:white;border-radius:9px;padding:4px 0}
+.award-list>p{font-size:11px;color:#9ea893;padding:12px;margin:0;line-height:1.6}
+.award-person{display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;color:#455b3b;cursor:pointer}
+.award-person:hover{background:#f4f8f0}
+.award-person input{width:auto;accent-color:var(--green);padding:0}
+.award-person span{flex:1;min-width:0;overflow-wrap:anywhere}
+.award-person small{color:#9ea893;font-size:10px}
+.award-results{text-align:left;font-size:11px;color:#5a665b;background:#f4f8f0;border:1px solid #e1e9d9;border-radius:9px;padding:12px;margin-top:16px}
+.award-results ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.award-results li{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.award-results li a{color:var(--green);font-weight:600;display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.award-results li.award-failed{color:#a0563f}
+.recipients-list{margin-bottom:30px}
+.recipients-list+.token-details{margin-bottom:55px}
+@media(max-width:740px){.heading-actions{gap:8px}.heading-actions .button{margin:0}}
