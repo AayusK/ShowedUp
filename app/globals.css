@@ -182,3 +182,46 @@
 .tr-qr{width:170px;padding:14px;margin:0;flex-shrink:0}
 .tr-qr svg{display:block}
 @media(max-width:740px){.tr-club-head h3{font-size:18px}.tr-verified{min-height:44px}.tr-summary{font-size:11px}.tr-unverified-list{padding:0 18px}.tr-share{flex-direction:column;align-items:stretch;padding:22px;gap:22px;margin-bottom:40px}.tr-share h2{font-size:21px}.tr-share-link{font-size:16px}.tr-qr{margin:0 auto}}
+/* ===== Track record · Step 4: openings ===== */
+.field textarea{padding:12px;border:1px solid #dfe5d8;background:white;border-radius:9px;color:#455b3b;min-width:0;font:inherit;font-size:12px;line-height:1.6;width:100%;resize:vertical}
+.field textarea:focus-visible,.field select:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.opening-preview{font-size:12px;text-align:left;margin:18px 0}.opening-preview strong{color:#455b3b;font-weight:600}
+.openings-section .event-card{display:block}
+.openings-section .event-card h3,.opening-panel h1{overflow-wrap:anywhere}
+.openings-heading{margin-top:10px}
+.openings-list .opening-item+.opening-item{border-top:1px solid #edf0e8}
+.openings-list .row-count{margin-right:10px}
+.openings-notice{padding-bottom:65px}
+.applicants{border-top:1px solid #edf0e8;padding:6px 0 18px 55px}
+.applicants-note{font-size:12px;padding:14px 0 0}
+.applicants-note .text-link{background:none;padding:0}
+.applicant-row{display:flex;align-items:center;gap:16px;padding:16px 0}
+.applicant-row+.applicant-row{border-top:1px solid #f0f2ec}
+.applicant-row .event-info{min-width:0}
+.applicant-row .event-info h3{font-size:15px;overflow-wrap:anywhere}
+.applicant-row .event-info p{font-size:12px}
+.applicant-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:9px}
+.applicant-links .text-link{font-size:12px;gap:6px}
+.applicant-status{font-size:10px}
+.applicant-status.accepted{background:#e3eedb;color:#3d6a35}
+.applicant-actions{display:flex;gap:8px;flex-shrink:0}
+.applicant-actions .button{padding:10px 16px}
+.opening-panel .opening-description{max-width:400px;white-space:pre-line;overflow-wrap:anywhere}
+.opening-rule{text-align:left;padding:20px 0;margin:25px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.opening-rule .eyebrow{margin-bottom:9px}
+.opening-rule strong{display:block;font-size:17px;font-weight:500;letter-spacing:-.4px;color:var(--foreground);line-height:1.4}
+.opening-rule small{display:block;color:#8c9785;font-size:11px;line-height:1.7;margin-top:8px}
+.opening-result{display:flex;gap:12px;align-items:flex-start;text-align:left;background:#edf3e6;padding:16px 18px;border-radius:12px;margin:18px 0;color:#678553}
+.opening-result.short{background:#f3f1eb;color:#9d8b6a}
+.opening-result strong{font-size:13px;font-weight:600;color:var(--foreground)}
+.opening-result p{font-size:12px;line-height:1.6;margin-top:3px;color:#5a665b}
+.opening-badges{list-style:none;margin:0 0 18px;padding:0;text-align:left}
+.opening-badges li{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid #f0f2ec}
+.opening-badges li:first-child{border-top:0}
+.opening-badges li>div{flex:1;min-width:0}
+.opening-badges strong{display:block;font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.opening-badges small{display:block;color:#8c9785;font-size:11px;margin-top:4px}
+.opening-panel .opening-consent{font-size:12px;line-height:1.7;text-align:left;color:#5a665b;background:#f7f8f4;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 18px;max-width:none}
+.opening-consent strong{color:var(--foreground);font-weight:600}
+.opening-panel .button.full+.claim-note{margin-bottom:14px}
+@media(max-width:740px){.applicants{padding-left:0}.applicant-row{flex-wrap:wrap;gap:10px}.applicant-row .event-info{flex-basis:100%}.openings-notice{padding-bottom:40px}.openings-list .row-count{display:flex;flex-basis:100%;margin:0}}

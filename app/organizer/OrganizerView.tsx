@@ -13,6 +13,7 @@ import { OrganizerAccessModal, type Unlocked } from "@/components/OrganizerAcces
 import { LEGACY_CLUB_ID, LEGACY_CLUB_NAME, type ClubInfo } from "@/lib/clubs";
 import { ClubsPanel } from "./ClubsPanel";
 import { AwardModal, type AwardTarget } from "./AwardModal";
+import { OpeningsPanel } from "./OpeningsPanel";
 
 interface EventItem {
   id: string;
@@ -216,6 +217,7 @@ export default function OrganizerView() {
     </div>
     <div className="subtle-notice"><Icon name="shield"/>Creating an event needs your club’s passcode. Each event gets its own nontransferable token on Solana devnet, issued from your club’s wallet.</div>
     {admin && session && <ClubsPanel adminPassword={session.password} />}
+    {session && <OpeningsPanel session={session} club={club} />}
   </main><SiteFooter />
   {award !== false && session && <AwardModal session={session} existing={award ?? undefined} onClose={() => setAward(false)} onChanged={loadEvents} />}
   {accessModal && <OrganizerAccessModal initialError={accessError} onClose={()=>setAccessModal(false)} onUnlocked={onUnlocked} />}
