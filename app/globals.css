@@ -117,3 +117,15 @@
 .present-names li{font-size:clamp(14px,2.3vh,24px);background:#edf2e9;color:#3d5a45;border-radius:40px;padding:.9vh 1.2vw;animation:fadeSlideUp .35s ease backwards;overflow-wrap:anywhere}
 @media(max-width:900px){.present{grid-template-columns:1fr;gap:4vh;padding:9vh 7vw 6vh;align-items:start}.present-qr-box,.present-track{width:min(78vw,56vh)}.present-qr-box{height:min(78vw,56vh)}.present-info{text-align:center}.present-count{justify-content:center;transform-origin:center}.present-names{justify-content:center}}
 @media(prefers-reduced-motion:reduce){.present-count.count-bump,.present-names li{animation:none}}
+
+/* ===== Track record · Step 1: clubs (sign-in club picker, registry admin panel) ===== */
+.field select{padding:12px;border:1px solid #dfe5d8;background:white;border-radius:9px;color:#455b3b;min-width:0;font:inherit;font-size:12px;width:100%}
+.modal-club{font-size:12px;color:#7f8d73;margin:18px 0 -8px}
+.modal-club strong{color:#455b3b;font-weight:600}
+.check-field{display:flex;align-items:flex-start;gap:10px;text-align:left;font-size:11px;line-height:1.6;color:#5a665b;margin:0 0 22px}
+.check-field input{margin-top:3px;accent-color:var(--green)}
+.clubs-heading{margin-top:10px}
+.club-row .button{margin-left:0}
+.clubs-heading~.form-error{margin-bottom:40px}
+.clubs-heading+.event-list{margin-bottom:65px}
+@media(max-width:740px){.club-row .pill-link{margin-left:0}.clubs-heading+.event-list{margin-bottom:40px}}

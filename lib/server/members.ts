@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import { getEvent } from "./events";
+import type { EventRecord } from "./events";
 
 // One display name per wallet, asked for on a wallet's first claim and reused afterwards.
 // Only the server reads this table; the browser can learn *whether* a wallet has a name,
@@ -40,9 +40,8 @@ export interface Attendee {
  *  - `claims`: this app's own record of the claims it minted.
  * If the stream table doesn't exist or can't be read, the list is simply the app's own record.
  */
-export async function eventAttendees(eventId: string): Promise<Attendee[]> {
-  const event = await getEvent(eventId);
-  if (!event) return [];
+export async function eventAttendees(event: Pick<EventRecord, "id" | "mint">): Promise<Attendee[]> {
+  const eventId = event.id;
 
   const [streamed, recorded] = await Promise.all([
     db().from("chain_claims").select("wallet, block_time, received_at").eq("mint", event.mint),

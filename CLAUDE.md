@@ -135,14 +135,15 @@ npm run seed -- <wallet> # seed past events for a wallet
 ## 5. Environment variables
 
 Locally in `.env.local` (gitignored); in production in Vercel → Settings → Environment Variables.
-`.env.example` documents them. **All six are server-only.** None may be `NEXT_PUBLIC_*`:
+`.env.example` documents them. **All seven are server-only.** None may be `NEXT_PUBLIC_*`:
 Next.js inlines `NEXT_PUBLIC_*` values into browser bundles.
 
 | Var | Used for |
 |---|---|
-| `ORGANIZER_SECRET_KEY` | base58 secret key (or JSON byte array). Pays all fees, mint authority for every event |
+| `ORGANIZER_SECRET_KEY` | base58 secret key (or JSON byte array). Pays all fees for every club; issuer (mint authority) for the default club's events |
 | `EVENT_SECRET` | HMAC key for the rotating claim codes |
-| `ORGANIZER_PASSWORD` | shared password for organizer actions (`x-organizer-password` header) |
+| `ORGANIZER_PASSWORD` | registry admin password (creates and verifies clubs) and the default club's passcode (`x-organizer-password` header) |
+| `CLUB_KEY_SECRET` | 32+ random characters. Each club's keypair is `HMAC-SHA256(CLUB_KEY_SECRET, "club:" + id)` used as the 32-byte seed; nothing is stored. **Changing it orphans every club's badges.** Unset = only the default club can issue |
 | `RPC_URL` | devnet RPC (a Helius devnet URL with API key). Falls back to the public devnet endpoint |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SECRET_KEY` | Supabase secret (`sb_secret_…`) key; bypasses RLS |

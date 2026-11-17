@@ -6,6 +6,8 @@ import { isValidCode } from "@/lib/server/code";
 import { hasClaimed, mintAttendance, verifyWalletSignature } from "@/lib/server/claim";
 import { claimMessage } from "@/lib/claimMessage";
 import { OrganizerUnfundedError } from "@/lib/server/mint";
+import { eventClubId } from "@/lib/server/auth";
+import { ClubKeyError, getClub, getClubKeypair } from "@/lib/server/clubs";
 import { hasMemberName, saveMemberName } from "@/lib/server/members";
 import { cleanName } from "@/lib/memberName";
 
@@ -85,13 +87,17 @@ export async function POST(request: Request) {
     if (reservation === "confirmed") return NextResponse.json({ status: "already_claimed" });
     reserved = true;
 
-    // 6. Create the attendee's token account if needed and mint 1 (organizer pays).
-    const txSignature = await mintAttendance(mint, owner);
+    // 6. Create the attendee's token account if needed and mint 1. The organizer wallet pays;
+    //    the club that owns the event signs as the badge's issuer.
+    const club = await getClub(eventClubId(event));
+    if (!club) throw new ClubKeyError("This event's club no longer exists");
+    const txSignature = await mintAttendance(mint, owner, getClubKeypair(club));
     await confirmClaim(event.id, wallet58, txSignature);
     reserved = false;
     return NextResponse.json({ status: "success", signature: txSignature });
   } catch (e) {
     if (e instanceof OrganizerUnfundedError) return error("organizer_unfunded", 503);
+    if (e instanceof ClubKeyError) return error("server_not_configured", 500);
     if (e instanceof Error && /ORGANIZER_SECRET_KEY|SUPABASE_/.test(e.message)) return error("server_not_configured", 500);
     console.error("[api/claim] claim failed:", e instanceof Error ? e.message.split("\n")[0] : "unknown");
     return error("rpc_error", 502);

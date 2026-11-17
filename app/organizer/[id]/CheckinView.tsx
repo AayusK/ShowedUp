@@ -10,7 +10,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { OrganizerAccessModal } from "@/components/OrganizerAccessModal";
 import { formatDay, formatTime } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
-import { checkPassword, readPassword, savePassword } from "@/lib/organizerSession";
+import { checkSession, clubHeaders, readSession, saveSession, type OrganizerSession } from "@/lib/organizerSession";
 import { phantomBrowseLink } from "@/lib/phantom";
 import { useEmbeddedWallet } from "@/lib/embeddedWallet";
 import type { EventRecord } from "@/lib/server/events";
@@ -21,10 +21,12 @@ const COUNT_POLL_MS = 8000;
 const WINDOW_S = 30;
 const ROSTER_POLL_MS = 4000;
 
-export default function CheckinView({ event }: { event: EventRecord | null }) {
+export default function CheckinView({ event, club }: { event: EventRecord | null; club: { id: string; name: string } }) {
   // With email / Google sign-in on, attendees don't need Phantom, so the QR opens the claim page itself.
   const signInEnabled = useEmbeddedWallet().enabled;
-  const [password, setPassword] = useState<string | null>(null);
+  // The officer's sign-in. It must be for the club this event belongs to.
+  const [session, setSession] = useState<OrganizerSession | null>(null);
+  const password = session?.password ?? null;
   const [checkedSaved, setCheckedSaved] = useState(false);
   const [accessModal, setAccessModal] = useState(false);
   const [accessError, setAccessError] = useState("");
@@ -43,32 +45,32 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
 
   useEffect(() => { setOrigin(window.location.origin); }, []);
 
-  // Use the password saved on the organizer page; otherwise ask for it.
+  // Use the sign-in saved on the organizer page if it is for this event's club; otherwise ask.
   useEffect(() => {
-    const saved = readPassword();
-    if (!saved) { setCheckedSaved(true); setAccessModal(true); return; }
-    checkPassword(saved)
-      .then((ok) => {
-        if (ok) setPassword(saved);
-        else { savePassword(null); setAccessModal(true); }
+    const saved = readSession();
+    if (!saved || saved.clubId !== club.id) { setCheckedSaved(true); setAccessModal(true); return; }
+    checkSession(saved)
+      .then((check) => {
+        if (check.ok) setSession(saved);
+        else { saveSession(null); setAccessModal(true); }
       })
-      .catch(() => setPassword(saved))
+      .catch(() => setSession(saved))
       .finally(() => setCheckedSaved(true));
-  }, []);
+  }, [club.id]);
 
   const fetchCode = useCallback(async () => {
-    if (!password || !event || inFlight.current) return;
+    if (!session || !event || inFlight.current) return;
     inFlight.current = true;
     try {
       const res = await fetch(`/api/events/${event.id}/code`, {
-        headers: { "x-organizer-password": password },
+        headers: clubHeaders(session),
         cache: "no-store",
       });
       if (res.status === 401) {
-        savePassword(null);
-        setPassword(null);
+        saveSession(null);
+        setSession(null);
         setCode(null);
-        setAccessError("Your organizer session expired. Enter the password again.");
+        setAccessError("Your organizer session expired. Enter the passcode again.");
         setAccessModal(true);
         return;
       }
@@ -82,7 +84,7 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
     } finally {
       inFlight.current = false;
     }
-  }, [password, event]);
+  }, [session, event]);
 
   // Poll for the code, and fetch right away when the countdown hits zero.
   useEffect(() => {
@@ -112,12 +114,12 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
   // "Who's here": names of everyone who has claimed, newest first (organizer password needed).
   const [roster, setRoster] = useState<Attendee[] | null>(null);
   useEffect(() => {
-    if (!event || !password) return;
+    if (!event || !session) return;
     let cancelled = false;
     const load = async () => {
       try {
         const res = await fetch(`/api/events/${event.id}/attendees`, {
-          headers: { "x-organizer-password": password },
+          headers: clubHeaders(session),
           cache: "no-store",
         });
         if (!res.ok) return;
@@ -128,7 +130,7 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
     load();
     const poll = setInterval(load, ROSTER_POLL_MS);
     return () => { cancelled = true; clearInterval(poll); };
-  }, [event, password]);
+  }, [event, session]);
 
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 250);
@@ -189,22 +191,22 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
   return <><SiteHeader view="event" />
   <main className="shell">
     <Link className="back-link" href="/organizer">← All events</Link>
-    <div className="checkin-layout with-roster"><div><Badge>Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>Tap Claim. Your organizer covers the fees.</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}<button type="button" className="button secondary present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button></div>
+    <div className="checkin-layout with-roster"><div><Badge>{club.name} · Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>Tap Claim. Your organizer covers the fees.</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}<button type="button" className="button secondary present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button></div>
       <div className={`qr-panel${urgency ? " " + urgency : ""}`}><div className="qr-title"><span className="brand mini"><span className="brand-mark">↗</span>ShowedUp</span><span className="quiet-pill">DEVNET</span></div><h2>You’re in the right place.</h2><p>Scan to claim your attendance.</p>
         <div className="qr-wrap">{claimUrl
           ? <QRCodeSVG value={qrValue} size={224} fgColor="#173d2d" level="M" marginSize={1}/>
-          : <div style={{aspectRatio: "1", display: "grid", placeItems: "center"}}><p>{!checkedSaved || password ? "Loading code…" : "Organizer password needed to show the code."}</p></div>}</div>
+          : <div style={{aspectRatio: "1", display: "grid", placeItems: "center"}}><p>{!checkedSaved || password ? "Loading code…" : "Club passcode needed to show the code."}</p></div>}</div>
         <div className="code-line">CODE <strong>{code ?? "······"}</strong><span>Refreshes in {seconds}s</span></div>
         <div className="countdown-track"><div style={{width: `${seconds / WINDOW_S * 100}%`}}/></div>
         {codeError && <p className="form-error" role="alert">{codeError}</p>}
         {!password && checkedSaved
-          ? <button className="text-link qr-link" onClick={() => { setAccessError(""); setAccessModal(true); }}>Enter organizer password <Icon name="arrow" size={16}/></button>
+          ? <button className="text-link qr-link" onClick={() => { setAccessError(""); setAccessModal(true); }}>Enter club passcode <Icon name="arrow" size={16}/></button>
           : claimUrl && <a href={claimUrl} target="_blank" rel="noreferrer" className="text-link qr-link">Open attendee screen <Icon name="arrow" size={16}/></a>}
         <small className="qr-disclaimer">Each code works for up to a minute, then scan again.</small>
       </div>
       <aside className="roster-panel" aria-label="Who’s here"><div className="roster-head"><h2>Who’s here</h2>{roster && <span className="roster-count" aria-live="polite">{roster.length}</span>}</div>
         <div className="roster-body">{roster === null
-          ? <p className="roster-empty">{!checkedSaved || password ? "Loading names…" : "Enter the organizer password to see who’s here."}</p>
+          ? <p className="roster-empty">{!checkedSaved || password ? "Loading names…" : "Enter the club passcode to see who’s here."}</p>
           : roster.length === 0
             ? <div className="roster-empty"><Icon name="people" size={22}/><p>Names show up here as people check in.</p></div>
             : <ol className="roster-list">{roster.map((a) => <li key={a.wallet}>{a.name}</li>)}</ol>}</div>
@@ -217,7 +219,7 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
     <div className="present-qr">
       <div className="present-qr-box">{claimUrl
         ? <QRCodeSVG value={qrValue} size={560} fgColor="#173d2d" level="M" marginSize={1}/>
-        : <p>{!checkedSaved || password ? "Loading code…" : "Organizer password needed to show the code."}</p>}</div>
+        : <p>{!checkedSaved || password ? "Loading code…" : "Club passcode needed to show the code."}</p>}</div>
       <div className="present-code"><span>CODE</span><strong>{code ?? "······"}</strong></div>
       <div className="present-track"><div style={{width: `${seconds / WINDOW_S * 100}%`}}/></div>
       <small className="present-refresh">{code ? `New code in ${seconds}s` : "\u00a0"}</small>
@@ -230,6 +232,6 @@ export default function CheckinView({ event }: { event: EventRecord | null }) {
       {roster && roster.length > 0 && <ol className="present-names" aria-label="Latest check-ins">{roster.slice(0, 6).map((a) => <li key={a.wallet}>{a.name}</li>)}</ol>}
     </div>
   </div>}
-  {accessModal && <OrganizerAccessModal initialError={accessError} onClose={() => setAccessModal(false)} onUnlocked={(pw) => { setPassword(pw); setAccessModal(false); setAccessError(""); }} />}
+  {accessModal && <OrganizerAccessModal fixedClub={club} initialError={accessError} onClose={() => setAccessModal(false)} onUnlocked={(unlocked) => { setSession(unlocked.session); setAccessModal(false); setAccessError(""); }} />}
   </>;
 }

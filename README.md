@@ -52,14 +52,15 @@ API: `GET/POST /api/events`, `GET /api/events/[id]/code`, `POST /api/claim`,
 
 ## Configuration
 
-Six server-only settings, plus one optional public one. In production they're in **Vercel → showedup → Settings → Environment
+Seven server-only settings, plus one optional public one. In production they're in **Vercel → showedup → Settings → Environment
 Variables**; locally they're in `.env.local` (never commit it). See `.env.example`.
 
 | Variable | What it's for |
 |---|---|
 | `ORGANIZER_SECRET_KEY` | The organizer wallet's secret key (base58 or JSON array). Pays all fees, mints every token. |
 | `EVENT_SECRET` | Any long random string. Signs the rotating QR codes. |
-| `ORGANIZER_PASSWORD` | Shared password for organizer actions (creating events, showing QR codes). |
+| `ORGANIZER_PASSWORD` | Password of the registry admin, who creates and verifies clubs. Also the default club's passcode (creating events, showing QR codes). |
+| `CLUB_KEY_SECRET` | Any long random string (32+ characters). Every other club's Solana wallet is worked out from it and the club's id, so no club key is stored anywhere. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. **Never change it once clubs exist:** every club would get a new wallet and the badges they already issued would stop counting. |
 | `RPC_URL` | Devnet RPC. Use a free [Helius](https://helius.dev) **devnet** URL; the public endpoint rate-limits. |
 | `SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_SECRET_KEY` | Supabase secret key (`sb_secret_…`, Project Settings → API Keys). |
@@ -119,7 +120,7 @@ npm install --ignore-scripts
 `--ignore-scripts` is required on Windows: a dependency of `@solana/wallet-adapter-wallets` runs a
 Unix-only install script.
 
-Create `.env.local` with the six variables above:
+Create `.env.local` with the seven variables above:
 
 ```powershell
 Copy-Item .env.example .env.local
