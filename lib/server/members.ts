@@ -2,6 +2,9 @@ import "server-only";
 import { db } from "./db";
 import type { EventRecord } from "./events";
 
+// Postgres / PostgREST codes for "that column doesn't exist": the new SQL hasn't been run yet.
+const MISSING_COLUMN = new Set(["42703", "PGRST204"]);
+
 // One display name per wallet, asked for on a wallet's first claim and reused afterwards.
 // Only the server reads this table; the browser can learn *whether* a wallet has a name,
 // never the name itself (so nobody can look up who owns a wallet).
@@ -72,21 +75,31 @@ export interface Attendee {
 export async function eventAttendees(event: Pick<EventRecord, "id" | "mint">): Promise<Attendee[]> {
   const eventId = event.id;
 
-  const [streamed, recorded] = await Promise.all([
+  const readClaims = (columns: string) =>
+    db().from("claims").select(columns).eq("event_id", eventId).eq("status", "confirmed");
+  const [streamed, firstRead] = await Promise.all([
     db().from("chain_claims").select("wallet, block_time, received_at").eq("mint", event.mint),
-    db().from("claims").select("wallet, updated_at").eq("event_id", eventId).eq("status", "confirmed"),
+    readClaims("wallet, updated_at, revoked_at"),
   ]);
+  // Before db/04_revocation.sql is run there is no `revoked_at` column: nobody has been revoked.
+  const recorded = firstRead.error && MISSING_COLUMN.has(firstRead.error.code ?? "")
+    ? await readClaims("wallet, updated_at")
+    : firstRead;
   if (recorded.error) throw new Error(`attendee read failed: ${recorded.error.message}`);
+  const claimRows = (recorded.data ?? []) as unknown as { wallet: string; updated_at: string | null; revoked_at?: string | null }[];
 
+  // A badge the club took back is burned on Solana; leave that wallet out, whichever source saw it.
+  const revoked = new Set(claimRows.filter((r) => r.revoked_at).map((r) => r.wallet));
   const byWallet = new Map<string, { source: Attendee["source"]; at: string | null }>();
   for (const row of streamed.error ? [] : (streamed.data ?? [])) {
+    if (revoked.has(row.wallet as string)) continue;
     const at = (row.block_time ?? row.received_at ?? null) as string | null;
     const seen = byWallet.get(row.wallet as string);
     if (!seen || (at && (!seen.at || at > seen.at))) byWallet.set(row.wallet as string, { source: "stream", at });
   }
-  for (const row of recorded.data ?? []) {
-    if (!byWallet.has(row.wallet as string)) {
-      byWallet.set(row.wallet as string, { source: "app", at: (row.updated_at ?? null) as string | null });
+  for (const row of claimRows) {
+    if (!revoked.has(row.wallet) && !byWallet.has(row.wallet)) {
+      byWallet.set(row.wallet, { source: "app", at: row.updated_at ?? null });
     }
   }
   if (byWallet.size === 0) return [];

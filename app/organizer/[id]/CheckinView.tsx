@@ -113,6 +113,11 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
 
   // "Who's here": names of everyone who has claimed, newest first (organizer password needed).
   const [roster, setRoster] = useState<Attendee[] | null>(null);
+  // True when this club can take back this badge (newer badges only); then each name gets "Revoke".
+  const [revocable, setRevocable] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const [revokeError, setRevokeError] = useState("");
+  const [rosterTick, setRosterTick] = useState(0);
   useEffect(() => {
     if (!event || !session) return;
     let cancelled = false;
@@ -123,14 +128,37 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
           cache: "no-store",
         });
         if (!res.ok) return;
-        const data = (await res.json()) as { attendees: Attendee[] };
-        if (!cancelled) setRoster(data.attendees);
+        const data = (await res.json()) as { attendees: Attendee[]; revocable?: boolean };
+        if (!cancelled) { setRoster(data.attendees); setRevocable(!!data.revocable); }
       } catch {}
     };
     load();
     const poll = setInterval(load, ROSTER_POLL_MS);
     return () => { cancelled = true; clearInterval(poll); };
-  }, [event, session]);
+  }, [event, session, rosterTick]);
+
+  // Take back a badge given by mistake: the club burns that person's token on Solana.
+  const revoke = async (a: Attendee) => {
+    if (!event || !session || revoking) return;
+    if (!window.confirm(`Take back this badge from ${a.name}? It is removed from their track record on Solana. This can't be undone.`)) return;
+    setRevoking(a.wallet);
+    setRevokeError("");
+    try {
+      const res = await fetch(`/api/events/${event.id}/revoke`, {
+        method: "POST",
+        headers: { ...clubHeaders(session), "content-type": "application/json" },
+        body: JSON.stringify({ wallet: a.wallet }),
+      });
+      if (res.status === 401) setRevokeError("Your officer sign-in has expired. Reload the page and enter the passcode again.");
+      else if (res.status === 409) setRevokeError("This badge was created before badges could be taken back.");
+      else if (!res.ok) setRevokeError(`Couldn’t take back ${a.name}’s badge. Try again in a moment.`);
+    } catch {
+      setRevokeError("Lost connection to the server. Try again in a moment.");
+    } finally {
+      setRevoking(null);
+      setRosterTick((t) => t + 1);
+    }
+  };
 
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 250);
@@ -209,7 +237,8 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
           ? <p className="roster-empty">{!checkedSaved || password ? "Loading names…" : "Enter the club passcode to see who’s here."}</p>
           : roster.length === 0
             ? <div className="roster-empty"><Icon name="people" size={22}/><p>Names show up here as people check in.</p></div>
-            : <ol className="roster-list">{roster.map((a) => <li key={a.wallet}>{a.name}</li>)}</ol>}</div>
+            : <ol className="roster-list">{roster.map((a) => <li key={a.wallet} className={revocable ? "has-revoke" : undefined}>{a.name}{revocable && <button type="button" className="text-link revoke-button" disabled={revoking !== null} onClick={() => revoke(a)}>{revoking === a.wallet ? "Revoking…" : "Revoke"}</button>}</li>)}</ol>}</div>
+        {revokeError && <p className="form-error revoke-error" role="alert">{revokeError}</p>}
         {streamedCount > 0 && roster && <small className="qr-disclaimer" style={{margin: "10px 0 12px", padding: "0 24px", textAlign: "center"}}>{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
       </aside></div>
     <div className="token-details"><Icon name="shield" size={17}/><span>Event token<small>{event.name} · Token-2022 · Nontransferable · 0 decimals</small></span><a className="pill-link" href={explorerLink(event.mint)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div>

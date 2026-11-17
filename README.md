@@ -12,6 +12,23 @@ tier: 1 event = Showed Up, 3 = Regular, 5 = Core Member.
 
 Product spec: [SPEC.md](SPEC.md). Notes for Claude Code: [CLAUDE.md](CLAUDE.md).
 
+**Now a track record across clubs.** Each club issues badges from its own Solana wallet: attendance
+by QR code, and role badges (Mentor, Speaker, Volunteer…) awarded by an officer. A student's
+track record groups them by club and term; a second club can post an opening with a rule and
+pick people from records it can check on Solana. Records are positive only, and no student's
+name is ever written on-chain.
+
+## Before merging to `main` or deploying (one-time)
+
+The track-record code needs these on the **live** setup first, or the new pages fail:
+
+1. In the live Supabase project's SQL editor, run in order: `db/01_clubs.sql`,
+   `db/02_role_badges.sql`, `db/03_openings.sql`, `db/04_revocation.sql` (each is safe to run
+   twice and never drops anything). Also `streams/chain_claims.sql` if it isn't there yet.
+2. In Vercel → Settings → Environment Variables, set `CLUB_KEY_SECRET` (see Configuration). Set it
+   once and never change it.
+3. Redeploy.
+
 ## Running an event (organizers)
 
 1. On the laptop that drives the projector, open https://showedup-phi.vercel.app/organizer.
@@ -47,8 +64,24 @@ work either way.
 
 The browser never talks to Solana or Supabase directly. Every secret stays on the server.
 
-API: `GET/POST /api/events`, `GET /api/events/[id]/code`, `POST /api/claim`,
-`GET /api/profile/[wallet]`, `GET /api/balance/[wallet]`, `POST /api/organizer/verify`.
+API: `GET/POST /api/clubs` (admin), `GET/POST /api/events`, `GET /api/events/[id]/code`,
+`GET /api/events/[id]/attendees`, `POST /api/events/[id]/award`, `POST /api/events/[id]/revoke`,
+`POST /api/claim`, `GET /api/profile/[wallet]`, `GET/POST /api/openings`, `/api/openings/[id]/{check,apply,applications}`,
+`GET /api/feed`, `GET /api/balance/[wallet]`, `POST /api/organizer/verify`.
+
+### Taking back a badge
+
+Officers see a **Revoke** button on the check-in "Who's here" list and on a role badge's
+recipients page. It burns the student's token: every badge made since clubs existed names its
+club as the token's *permanent delegate* (an address Solana lets remove that token from any
+holder). The organizer pays the fee and `claims.revoked_at` records it. Badges from before clubs
+existed can't be taken back, so the button doesn't show for them.
+
+### Live across clubs
+
+The home page shows the newest badges from every verified club, as the QuickNode Stream saw them
+on Solana: role, club, event, a shortened wallet and the time, never a name. It refreshes every
+15 seconds and shows a quiet "resting" line when the stream is off.
 
 ## Configuration
 
@@ -135,14 +168,21 @@ npm run build                       # production build (what Vercel runs)
 npx tsc --noEmit                    # typecheck
 npx eslint app components lib scripts
 npm run seed -- <wallet address>    # give a wallet 4 past events (safe to re-run; --target N)
+npm run fake-badge -- <wallet> [--club "Club name"]   # demo: a look-alike Mentor badge from a random wallet
 ```
+
+`fake-badge` shows what a forged badge looks like: a random wallet creates a badge with the right
+symbol and a real club's name, and the organizer pays the fee. Nothing is written to the
+database. The wallet's track record then lists it under "Unverified issuer · not counted".
 
 Local development uses the **same database and organizer wallet as production**, so events you
 create locally appear on the live site too.
 
 ### Deploying
 
-Vercel deploys automatically on every push to `main`. To check a deploy, open the project's
+Vercel deploys automatically on every push to `main` of the repo the Vercel project is linked
+to. The project is on Ojas's account (`ojas-deshmukhs-projects`); check which repo it's linked to
+before relying on this. To check a deploy, open the project's
 **Deployments** tab on vercel.com.
 
 ### Testing on a phone without deploying
