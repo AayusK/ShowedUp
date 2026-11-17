@@ -241,3 +241,10 @@
 @keyframes live-feed-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media(max-width:740px){.live-feed-list{padding:0 17px}.live-feed-row{flex-wrap:wrap;gap:10px}.live-feed-meta{flex-direction:row;align-items:center;flex-basis:100%;justify-content:space-between;padding-left:45px}}
 @media(prefers-reduced-motion:reduce){.live-feed-row{animation:none}}
+/* ===== Track record · A1 revocation ===== */
+.roster-list li.has-revoke{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.revoke-button{background:none;padding:0;font-size:12px;font-weight:500;color:#a0563f;flex-shrink:0}
+.revoke-button:hover{color:#7d3f2c}
+.revoke-button:disabled{opacity:.5;cursor:default;text-decoration:none}
+.roster-panel .revoke-error{margin:10px 24px 12px}
+.recipients-list~.revoke-error{margin:-8px 0 24px}

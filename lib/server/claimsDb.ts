@@ -45,3 +45,30 @@ export async function recordExistingClaim(eventId: string, wallet: string): Prom
 export async function releaseClaim(eventId: string, wallet: string): Promise<void> {
   await db().from("claims").delete().eq("event_id", eventId).eq("wallet", wallet).eq("status", "pending");
 }
+
+// Postgres / PostgREST codes for "that column doesn't exist": db/04_revocation.sql hasn't been run.
+const MISSING_COLUMN = new Set(["42703", "PGRST204"]);
+
+/**
+ * Notes that a club took back this badge (the token is already burned on Solana by now).
+ * With `addIfMissing` (after a real burn), a wallet the app never recorded (e.g. seen only by the
+ * QuickNode Stream) gets a row too, so it drops off the attendee list. Never throws: the burn on
+ * Solana is what counts.
+ */
+export async function markRevoked(eventId: string, wallet: string, addIfMissing = false): Promise<void> {
+  const revokedAt = new Date().toISOString();
+  const { data, error } = await db().from("claims")
+    .update({ revoked_at: revokedAt, updated_at: revokedAt })
+    // Only a finished claim. A claim still in flight keeps its lock; if it lands later, the
+    // badge stays visible and revocable rather than hidden while still held.
+    .eq("event_id", eventId).eq("wallet", wallet).eq("status", "confirmed").select("wallet");
+  if (error && MISSING_COLUMN.has(error.code ?? "")) {
+    console.warn("[claims] revoked_at column missing (run db/04_revocation.sql); burn still counts");
+    return;
+  }
+  if (error) { console.error("[claims] revoke note failed:", error.message.split("\n")[0]); return; }
+  if (!addIfMissing || (data && data.length > 0)) return;
+  const { error: insertErr } = await db().from("claims")
+    .insert({ event_id: eventId, wallet, status: "confirmed", revoked_at: revokedAt, updated_at: revokedAt });
+  if (insertErr && insertErr.code !== "23505") console.error("[claims] revoke note failed:", insertErr.message.split("\n")[0]);
+}
