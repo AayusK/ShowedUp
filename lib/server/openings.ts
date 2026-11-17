@@ -90,10 +90,6 @@ function fromRow(r: OpeningRow, clubName: string): OpeningInfo | null {
   };
 }
 
-async function clubNames(): Promise<Map<string, string>> {
-  return new Map((await readClubs()).map((c) => [c.id, c.name]));
-}
-
 function withClubNames(rows: OpeningRow[], names: Map<string, string>): OpeningInfo[] {
   return rows.flatMap((r) => {
     const name = names.get(r.club_id);
@@ -158,7 +154,10 @@ export async function listOpenOpenings(): Promise<OpeningInfo[]> {
   if (error) throw new Error(`openings read failed: ${error.message}`);
   const rows = data as OpeningRow[];
   if (rows.length === 0) return [];
-  return withClubNames(rows, await clubNames()).filter((o) => !o.closed).slice(0, MAX_LISTED);
+  // Only verified clubs' openings are listed publicly; an unverified club's opening still opens
+  // by its direct link.
+  const verified = new Map((await readClubs()).filter((c) => c.verified).map((c) => [c.id, c.name]));
+  return withClubNames(rows, verified).filter((o) => !o.closed).slice(0, MAX_LISTED);
 }
 
 /** Every opening of one club (open and closed), newest first, with how many people applied. */

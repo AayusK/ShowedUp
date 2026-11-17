@@ -13,7 +13,7 @@ export function SiteHeader({ view }: { view: NavView }) {
         <nav aria-label="Main navigation">
           <Link className={view === "home" ? "active" : ""} href="/">Overview</Link>
           <Link className={["organizer", "event"].includes(view) ? "active" : ""} href="/organizer">Organizer</Link>
-          <Link className={view === "profile" || view === "verify" ? "active" : ""} href="/profile/me">My attendance</Link>
+          <Link className={view === "profile" || view === "verify" ? "active" : ""} href="/profile/me">My track record</Link>
         </nav>
         <WalletButton />
       </div>

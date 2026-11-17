@@ -81,6 +81,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return error("rpc_error", 502);
     }
     if (!check.qualifies) {
+      // Part of the record couldn't be read (database or RPC hiccup): say so rather than
+      // telling someone who may well qualify that they don't.
+      if (check.partial) return error("rpc_error", 502);
       return NextResponse.json({ status: "not_qualified", counted: check.counted, needed: check.needed, remaining: check.remaining });
     }
 
