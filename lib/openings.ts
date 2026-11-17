@@ -92,10 +92,10 @@ export function applyMessage(openingId: string, wallet: string): string {
 
 /** The rule in plain words: "1 or more Mentor badges from a verified club". */
 export function ruleSentence(role: Role | null, minCount: number): string {
-  const plural = minCount === 1 ? "" : "s";
+  // "or more" always reads plural: "1 or more Mentor badges".
   return role
-    ? `${minCount} or more ${role} badge${plural} from a verified club`
-    : `${minCount} or more badge${plural} of any kind from a verified club`;
+    ? `${minCount} or more ${role} badges from a verified club`
+    : `${minCount} or more badges of any kind from a verified club`;
 }
 
 /**
