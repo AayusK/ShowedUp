@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
@@ -9,7 +9,9 @@ import { Badge } from "@/components/Badge";
 import { AttendanceCard } from "@/components/AttendanceCard";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { formatEventDetail } from "@/lib/format";
+import { TrackRecordGroups } from "@/components/TrackRecordGroups";
+import { TrackRecordShare } from "@/components/TrackRecordShare";
+import { TrackRecordUnverified } from "@/components/TrackRecordUnverified";
 import { explorerLink } from "@/lib/solana";
 import { fetchProfile, shortAddress, type Profile } from "@/lib/profileClient";
 import { useEmbeddedWallet } from "@/lib/embeddedWallet";
@@ -73,12 +75,23 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
     return message("shield", "Couldn’t reach Solana devnet.", "Your attendance is safe on-chain. Refresh in a moment to try again.");
   }
   if (loading || !profile) {
-    return message("spark", "Gathering your attendance…", "Reading your event tokens from Solana devnet.");
+    return message("spark", "Gathering the track record…", "Reading badges from Solana devnet.");
   }
 
   const count = profile.count;
   const isMine = profile.wallet === connectedWallet;
   const next = profile.nextTier;
+  // Everything on the verified record: meetings attended plus contributions awarded by clubs.
+  const total = profile.events.length;
+  const contributions = profile.contributions;
+  const clubCount = new Set(profile.events.map(e => e.club.id)).size;
+  const tally = [
+    count > 0 ? (count === 1 ? "One meeting" : `${count} meetings`) : "",
+    contributions > 0 ? (contributions === 1 ? "one contribution" : `${contributions} contributions`) : "",
+  ].filter(Boolean).join(" and ");
+  const intro = total === 0
+    ? "No badges yet. Your first one is a scan away."
+    : `${tally.charAt(0).toUpperCase()}${tally.slice(1)} across ${clubCount === 1 ? "one club" : `${clubCount} clubs`}. Each one issued by a verified club, and yours to keep.`;
   const heading = count >= 5 ? "That’s what makes you core." : count === 0 ? "Your first event is waiting." : "Good things come from coming back.";
   const body = count >= 5
     ? "You’ve reached Core Member. It’s a reflection of the time you’ve put in, and the community you’re building."
@@ -87,12 +100,15 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
       : "";
 
   return shell(<>
-    <div className="page-intro profile-heading"><div><Badge>{isMine ? "Your presence, collected" : "Attendance, on-chain"}</Badge><h1>{count === 0 ? "Every story starts somewhere." : "A little more connected."}</h1><p>{count === 0 ? "No meetings yet. Your first one is a scan away." : `${count === 1 ? "One meeting" : `${count} meetings`}. New faces. A place to belong.`}</p></div><span className="profile-avatar">{profile.wallet.slice(0, 2).toUpperCase()}</span></div>
+    <div className="page-intro profile-heading"><div><Badge>{isMine ? "Your track record" : "Track record, on-chain"}</Badge><h1>{total === 0 ? "Every story starts somewhere." : "A little more connected."}</h1><p>{intro}</p></div><span className="profile-avatar">{profile.wallet.slice(0, 2).toUpperCase()}</span></div>
     <div className="profile-layout"><div><AttendanceCard small count={count}/><div className="wallet-detail"><Icon name="wallet" size={15}/><span>{shortAddress(profile.wallet)} · {isMine ? "Your wallet" : "Viewed wallet"}</span><a href={explorerLink(profile.wallet)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div></div>
       <div className="panel membership"><span className="eyebrow">YOU KEEP SHOWING UP</span><h2>{heading}</h2><p>{body}</p><div className="tier-line"><div className="tier-fill" style={{width: fillWidth}}/>{TIERS.map(t => <span key={t.n} className={`tier-point ${count >= t.n ? "done" : "pending"}`}>{count >= t.n ? "✓" : t.n}<small>{t.name}<b>{t.n} {t.n === 1 ? "event" : "events"}</b></small></span>)}</div><div className="perk"><Icon name="spark"/><div><strong>A little extra, for showing up.</strong><p>Sample perks: priority workshop access, member recognition, and partner offers.</p></div><span className="quiet-pill">{count >= 5 ? "Unlocked" : "At 5 events"}</span></div></div></div>
-    <div className="section-heading history-heading"><div><span className="eyebrow">A RECORD OF BEING THERE</span><h2>{isMine ? "Your attendance" : "Attendance"}</h2></div><div className="history-actions"><span className="muted">{count} {count === 1 ? "event" : "events"}</span><Link className="pill-link" href="/verify"><Icon name="shield" size={14}/> Verify a wallet</Link></div></div>
-    <div className="panel history">{profile.events.length === 0
-      ? <div className="event-row"><div className="event-info"><h3>Nothing here yet.</h3><p>Scan the QR code at your next meeting and tap Claim.</p></div></div>
-      : profile.events.map((e, i) => <div className="event-row" key={e.id} style={{"--row-i": i} as React.CSSProperties}><span className="history-check"><Icon name="check" size={17}/></span><div className="event-info"><h3>{e.name}</h3><p>{e.club.name} · {formatEventDetail(e.date, e.location)}</p></div><span className="quiet-pill">{e.kind === "contribution" ? e.role : "Attendance collected"}</span><a className="icon-link" href={explorerLink(e.mint)} target="_blank" rel="noreferrer" aria-label={`View ${e.name} token on Solana Explorer`}><Icon name="external" size={17}/></a></div>)}</div>
+    <div className="section-heading history-heading"><div><span className="eyebrow">A RECORD OF BEING THERE</span><h2>{isMine ? "Your track record" : "Track record"}</h2></div><div className="history-actions"><span className="muted">{total} {total === 1 ? "badge" : "badges"}</span><Link className="pill-link" href="/verify"><Icon name="shield" size={14}/> Verify a wallet</Link></div></div>
+    {profile.partial && <p className="tr-note tr-partial">Some badges may be missing: part of the service couldn’t be reached. Refresh in a moment to try again.</p>}
+    {total === 0
+      ? <div className="panel history"><div className="event-row"><div className="event-info"><h3>Nothing here yet.</h3><p>Scan the QR code at your next meeting and tap Claim.</p></div></div></div>
+      : <TrackRecordGroups events={profile.events}/>}
+    <TrackRecordUnverified badges={profile.unverified ?? []} total={profile.unverifiedTotal ?? 0}/>
+    <TrackRecordShare wallet={profile.wallet} isMine={isMine}/>
   </>);
 }

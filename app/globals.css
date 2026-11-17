@@ -152,3 +152,33 @@
 .recipients-list{margin-bottom:30px}
 .recipients-list+.token-details{margin-bottom:55px}
 @media(max-width:740px){.heading-actions{gap:8px}.heading-actions .button{margin:0}}
+/* ===== Track record · Step 3: track record page ===== */
+.tr-club{margin-bottom:34px}
+.tr-club-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}
+.tr-club-head h3{font-size:21px;overflow-wrap:anywhere}
+.tr-verified{padding:7px 12px;font-size:11px}
+.tr-term{margin-bottom:14px}
+.tr-summary{padding:17px 0 15px;border-bottom:1px solid #edf0e8;font-size:12px;font-weight:600;color:#4b5a4a;line-height:1.6}
+.tr-summary+.event-row{border-top:0}
+.history .quiet-pill.tr-role{display:inline-flex;background:#e6f0dd;color:var(--green);font-size:10px;font-weight:600}
+.tr-note{font-size:11px;color:#9aa58e}
+.tr-partial{margin:-10px 0 18px}
+.tr-unverified{margin:50px 0 0;opacity:.82}
+.tr-unverified-head{margin-bottom:14px}
+.tr-unverified-head h2{font-size:17px;letter-spacing:-.3px;color:#7a807b}
+.tr-unverified-head p{font-size:11px;max-width:520px;margin-top:6px}
+.tr-unverified-list{padding:0 25px;background:#f6f7f3;border-style:dashed;border-color:#d9ddd3}
+.tr-unverified-list .event-row{flex-wrap:nowrap;gap:12px;padding:16px 0}
+.tr-unverified-list .event-info h3{font-size:14px;color:#7a807b;letter-spacing:-.2px}
+.tr-unverified-list .icon-link{background:white;border-color:#e1e5db;color:#7a807b}
+.tr-unverified .tr-note{margin-top:10px}
+.tr-share{display:flex;align-items:center;justify-content:space-between;gap:30px;padding:30px;margin:50px 0 55px}
+.tr-share-copy{min-width:0;flex:1}
+.tr-share h2{font-size:24px}
+.tr-share p{margin-top:8px;max-width:440px;font-size:12px}
+.tr-share-link{display:block;width:100%;max-width:440px;margin-top:18px;padding:11px 12px;border:1px solid #dfe5d8;border-radius:9px;background:#fbfcf9;color:#455b3b;font-size:12px;text-overflow:ellipsis}
+.tr-share-actions{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+.tr-share-status{font-size:11px;color:#a0563f}
+.tr-qr{width:170px;padding:14px;margin:0;flex-shrink:0}
+.tr-qr svg{display:block}
+@media(max-width:740px){.tr-club-head h3{font-size:18px}.tr-verified{min-height:44px}.tr-summary{font-size:11px}.tr-unverified-list{padding:0 18px}.tr-share{flex-direction:column;align-items:stretch;padding:22px;gap:22px;margin-bottom:40px}.tr-share h2{font-size:21px}.tr-share-link{font-size:16px}.tr-qr{margin:0 auto}}
