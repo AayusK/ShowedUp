@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import { getEvent } from "./events";
+import type { EventRecord } from "./events";
 
 // One display name per wallet, asked for on a wallet's first claim and reused afterwards.
 // Only the server reads this table; the browser can learn *whether* a wallet has a name,
@@ -16,6 +16,35 @@ export async function saveMemberName(wallet: string, name: string): Promise<void
   const { error } = await db().from("members")
     .upsert({ wallet, name, updated_at: new Date().toISOString() });
   if (error) throw new Error(`member save failed: ${error.message}`);
+}
+
+/**
+ * Everyone who has checked in to any of this club's events (or been awarded one of its badges),
+ * with their saved name, sorted by name. This is the list an officer picks from when awarding a
+ * contribution. Names are only ever sent to that club's officers.
+ */
+export async function clubMembers(allEvents: Pick<EventRecord, "id" | "mint" | "kind">[]): Promise<{ wallet: string; name: string }[]> {
+  // Only check-ins count. Being awarded a badge by address doesn't make someone a member, so it
+  // never shows a club their saved name.
+  const events = allEvents.filter((e) => e.kind !== "contribution");
+  if (events.length === 0) return [];
+  const [recorded, streamed] = await Promise.all([
+    db().from("claims").select("wallet").in("event_id", events.map((e) => e.id)).eq("status", "confirmed"),
+    db().from("chain_claims").select("wallet").in("mint", events.map((e) => e.mint)),
+  ]);
+  if (recorded.error) throw new Error(`member read failed: ${recorded.error.message}`);
+  const wallets = [...new Set([
+    ...(recorded.data ?? []).map((r) => r.wallet as string),
+    ...(streamed.error ? [] : (streamed.data ?? [])).map((r) => r.wallet as string),
+  ])].slice(0, 1000);
+  if (wallets.length === 0) return [];
+
+  const { data: members, error } = await db().from("members").select("wallet, name").in("wallet", wallets);
+  if (error) throw new Error(`member read failed: ${error.message}`);
+  const names = new Map((members ?? []).map((m) => [m.wallet as string, m.name as string]));
+  return wallets
+    .map((wallet) => ({ wallet, name: names.get(wallet) ?? `${wallet.slice(0, 4)}…${wallet.slice(-4)}` }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export interface Attendee {
@@ -40,9 +69,8 @@ export interface Attendee {
  *  - `claims`: this app's own record of the claims it minted.
  * If the stream table doesn't exist or can't be read, the list is simply the app's own record.
  */
-export async function eventAttendees(eventId: string): Promise<Attendee[]> {
-  const event = await getEvent(eventId);
-  if (!event) return [];
+export async function eventAttendees(event: Pick<EventRecord, "id" | "mint">): Promise<Attendee[]> {
+  const eventId = event.id;
 
   const [streamed, recorded] = await Promise.all([
     db().from("chain_claims").select("wallet, block_time, received_at").eq("mint", event.mint),

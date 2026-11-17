@@ -31,7 +31,8 @@ async function main() {
 
   // Imported after dotenv so the server libs see RPC_URL and the Supabase settings.
   const { PublicKey } = await import("@solana/web3.js");
-  const { randomBytes } = await import("crypto");
+  const { newId } = await import("../lib/server/ids");
+  const { LEGACY_CLUB_NAME } = await import("../lib/clubs");
   const { readEvents, addEvent } = await import("../lib/server/events");
   const { createEventMint } = await import("../lib/server/mint");
   const { hasClaimed, mintAttendance } = await import("../lib/server/claim");
@@ -54,16 +55,16 @@ async function main() {
     return;
   }
 
-  const ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
-  const newId = () => Array.from(randomBytes(8), (b) => ID_ALPHABET[b % ID_ALPHABET.length]).join("");
-
   for (const past of PAST_EVENTS) {
     if (count >= target) break;
 
-    let event = (await readEvents()).find((e) => e.name === past.name && e.date === past.date);
+    // Only the default club's events: the organizer wallet can't mint another club's badge.
+    let event = (await readEvents()).find((e) => !e.clubId && e.name === past.name && e.date === past.date);
     if (!event) {
-      const { mint } = await createEventMint(past);
-      event = { id: newId(), ...past, mint, createdAt: new Date().toISOString() };
+      // The id comes first: the token's address on Solana is derived from it.
+      const id = newId();
+      const { mint } = await createEventMint({ id, ...past, kind: "attendance", role: "Attendee", club: LEGACY_CLUB_NAME });
+      event = { id, ...past, mint, createdAt: new Date().toISOString() };
       await addEvent(event);
       console.log(`  created event   ${past.name}  (${explorerLink(mint)})`);
     }

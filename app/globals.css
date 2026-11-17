@@ -117,3 +117,111 @@
 .present-names li{font-size:clamp(14px,2.3vh,24px);background:#edf2e9;color:#3d5a45;border-radius:40px;padding:.9vh 1.2vw;animation:fadeSlideUp .35s ease backwards;overflow-wrap:anywhere}
 @media(max-width:900px){.present{grid-template-columns:1fr;gap:4vh;padding:9vh 7vw 6vh;align-items:start}.present-qr-box,.present-track{width:min(78vw,56vh)}.present-qr-box{height:min(78vw,56vh)}.present-info{text-align:center}.present-count{justify-content:center;transform-origin:center}.present-names{justify-content:center}}
 @media(prefers-reduced-motion:reduce){.present-count.count-bump,.present-names li{animation:none}}
+
+/* ===== Track record · Step 1: clubs (sign-in club picker, registry admin panel) ===== */
+.field select{padding:12px;border:1px solid #dfe5d8;background:white;border-radius:9px;color:#455b3b;min-width:0;font:inherit;font-size:12px;width:100%}
+.modal-club{font-size:12px;color:#7f8d73;margin:18px 0 -8px}
+.modal-club strong{color:#455b3b;font-weight:600}
+.check-field{display:flex;align-items:flex-start;gap:10px;text-align:left;font-size:11px;line-height:1.6;color:#5a665b;margin:0 0 22px}
+.check-field input{margin-top:3px;accent-color:var(--green)}
+.clubs-heading{margin-top:10px}
+.club-row .button{margin-left:0}
+.clubs-heading~.form-error{margin-bottom:40px}
+.clubs-heading+.event-list{margin-bottom:65px}
+@media(max-width:740px){.club-row .pill-link{margin-left:0}.clubs-heading+.event-list{margin-bottom:40px}}
+
+/* ===== Track record · Step 2: role badges ("Award contribution") ===== */
+.heading-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.heading-actions .button{margin-left:0}
+.award-modal{max-width:520px;max-height:calc(100vh - 48px);overflow-y:auto}
+.field textarea{padding:12px;border:1px solid #dfe5d8;background:white;border-radius:9px;color:#455b3b;min-width:0;font:inherit;font-size:12px;width:100%;resize:vertical}
+.field>small{font-size:10px;color:#9ea893;line-height:1.6}
+.award-pick>span{font-size:10px;color:#7f8d73}
+.award-list{max-height:170px;overflow-y:auto;border:1px solid #dfe5d8;background:white;border-radius:9px;padding:4px 0}
+.award-list>p{font-size:11px;color:#9ea893;padding:12px;margin:0;line-height:1.6}
+.award-person{display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;color:#455b3b;cursor:pointer}
+.award-person:hover{background:#f4f8f0}
+.award-person input{width:auto;accent-color:var(--green);padding:0}
+.award-person span{flex:1;min-width:0;overflow-wrap:anywhere}
+.award-person small{color:#9ea893;font-size:10px}
+.award-results{text-align:left;font-size:11px;color:#5a665b;background:#f4f8f0;border:1px solid #e1e9d9;border-radius:9px;padding:12px;margin-top:16px}
+.award-results ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.award-results li{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.award-results li a{color:var(--green);font-weight:600;display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.award-results li.award-failed{color:#a0563f}
+.recipients-list{margin-bottom:30px}
+.recipients-list+.token-details{margin-bottom:55px}
+@media(max-width:740px){.heading-actions{gap:8px}.heading-actions .button{margin:0}}
+/* ===== Track record · Step 3: track record page ===== */
+.tr-club{margin-bottom:34px}
+.tr-club-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}
+.tr-club-head h3{font-size:21px;overflow-wrap:anywhere}
+.tr-verified{padding:7px 12px;font-size:11px}
+.tr-term{margin-bottom:14px}
+.tr-summary{padding:17px 0 15px;border-bottom:1px solid #edf0e8;font-size:12px;font-weight:600;color:#4b5a4a;line-height:1.6}
+.tr-summary+.event-row{border-top:0}
+.history .quiet-pill.tr-role{display:inline-flex;background:#e6f0dd;color:var(--green);font-size:10px;font-weight:600}
+.tr-note{font-size:11px;color:#9aa58e}
+.tr-partial{margin:-10px 0 18px}
+.tr-unverified{margin:50px 0 0;opacity:.82}
+.tr-unverified-head{margin-bottom:14px}
+.tr-unverified-head h2{font-size:17px;letter-spacing:-.3px;color:#7a807b}
+.tr-unverified-head p{font-size:11px;max-width:520px;margin-top:6px}
+.tr-unverified-list{padding:0 25px;background:#f6f7f3;border-style:dashed;border-color:#d9ddd3}
+.tr-unverified-list .event-row{flex-wrap:nowrap;gap:12px;padding:16px 0}
+.tr-unverified-list .event-info h3{font-size:14px;color:#7a807b;letter-spacing:-.2px}
+.tr-unverified-list .icon-link{background:white;border-color:#e1e5db;color:#7a807b}
+.tr-unverified .tr-note{margin-top:10px}
+.tr-share{display:flex;align-items:center;justify-content:space-between;gap:30px;padding:30px;margin:50px 0 55px}
+.tr-share-copy{min-width:0;flex:1}
+.tr-share h2{font-size:24px}
+.tr-share p{margin-top:8px;max-width:440px;font-size:12px}
+.tr-share-link{display:block;width:100%;max-width:440px;margin-top:18px;padding:11px 12px;border:1px solid #dfe5d8;border-radius:9px;background:#fbfcf9;color:#455b3b;font-size:12px;text-overflow:ellipsis}
+.tr-share-actions{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+.tr-share-status{font-size:11px;color:#a0563f}
+.tr-qr{width:170px;padding:14px;margin:0;flex-shrink:0}
+.tr-qr svg{display:block}
+@media(max-width:740px){.tr-club-head h3{font-size:18px}.tr-verified{min-height:44px}.tr-summary{font-size:11px}.tr-unverified-list{padding:0 18px}.tr-share{flex-direction:column;align-items:stretch;padding:22px;gap:22px;margin-bottom:40px}.tr-share h2{font-size:21px}.tr-share-link{font-size:16px}.tr-qr{margin:0 auto}}
+/* ===== Track record · Step 4: openings ===== */
+.field textarea{padding:12px;border:1px solid #dfe5d8;background:white;border-radius:9px;color:#455b3b;min-width:0;font:inherit;font-size:12px;line-height:1.6;width:100%;resize:vertical}
+.field textarea:focus-visible,.field select:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.opening-preview{font-size:12px;text-align:left;margin:18px 0}.opening-preview strong{color:#455b3b;font-weight:600}
+.openings-section .event-card{display:block}
+.openings-section .event-card h3,.opening-panel h1{overflow-wrap:anywhere}
+.openings-heading{margin-top:10px}
+.openings-list .opening-item+.opening-item{border-top:1px solid #edf0e8}
+.openings-list .row-count{margin-right:10px}
+.openings-notice{padding-bottom:65px}
+.applicants{border-top:1px solid #edf0e8;padding:6px 0 18px 55px}
+.applicants-note{font-size:12px;padding:14px 0 0}
+.applicants-note .text-link{background:none;padding:0}
+.applicant-row{display:flex;align-items:center;gap:16px;padding:16px 0}
+.applicant-row+.applicant-row{border-top:1px solid #f0f2ec}
+.applicant-row .event-info{min-width:0}
+.applicant-row .event-info h3{font-size:15px;overflow-wrap:anywhere}
+.applicant-row .event-info p{font-size:12px}
+.applicant-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:9px}
+.applicant-links .text-link{font-size:12px;gap:6px}
+.applicant-status{font-size:10px}
+.applicant-status.accepted{background:#e3eedb;color:#3d6a35}
+.applicant-actions{display:flex;gap:8px;flex-shrink:0}
+.applicant-actions .button{padding:10px 16px}
+.opening-panel .opening-description{max-width:400px;white-space:pre-line;overflow-wrap:anywhere}
+.opening-rule{text-align:left;padding:20px 0;margin:25px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.opening-rule .eyebrow{margin-bottom:9px}
+.opening-rule strong{display:block;font-size:17px;font-weight:500;letter-spacing:-.4px;color:var(--foreground);line-height:1.4}
+.opening-rule small{display:block;color:#8c9785;font-size:11px;line-height:1.7;margin-top:8px}
+.opening-result{display:flex;gap:12px;align-items:flex-start;text-align:left;background:#edf3e6;padding:16px 18px;border-radius:12px;margin:18px 0;color:#678553}
+.opening-result.short{background:#f3f1eb;color:#9d8b6a}
+.opening-result strong{font-size:13px;font-weight:600;color:var(--foreground)}
+.opening-result p{font-size:12px;line-height:1.6;margin-top:3px;color:#5a665b}
+.opening-badges{list-style:none;margin:0 0 18px;padding:0;text-align:left}
+.opening-badges li{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid #f0f2ec}
+.opening-badges li:first-child{border-top:0}
+.opening-badges li>div{flex:1;min-width:0}
+.opening-badges strong{display:block;font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.opening-badges small{display:block;color:#8c9785;font-size:11px;margin-top:4px}
+.opening-panel .opening-consent{font-size:12px;line-height:1.7;text-align:left;color:#5a665b;background:#f7f8f4;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 18px;max-width:none}
+.opening-consent strong{color:var(--foreground);font-weight:600}
+.opening-panel .button.full+.claim-note{margin-bottom:14px}
+@media(max-width:740px){.applicants{padding-left:0}.applicant-row{flex-wrap:wrap;gap:10px}.applicant-row .event-info{flex-basis:100%}.openings-notice{padding-bottom:40px}.openings-list .row-count{display:flex;flex-basis:100%;margin:0}}

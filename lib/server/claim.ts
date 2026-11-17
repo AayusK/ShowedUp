@@ -1,6 +1,6 @@
 import "server-only";
 import { createPublicKey, verify } from "crypto";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey, Transaction, type Keypair } from "@solana/web3.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   ExtensionType,
@@ -15,7 +15,7 @@ import {
 } from "@solana/spl-token";
 import bs58 from "bs58";
 import { getOrganizerKeypair } from "./organizer";
-import { OrganizerUnfundedError, getConnection, withRetry } from "./mint";
+import { OrganizerUnfundedError, getConnection, uniqueSigners, withRetry } from "./mint";
 
 const FEE_BUFFER_LAMPORTS = 10_000;
 
@@ -59,13 +59,17 @@ export async function hasClaimed(mint: PublicKey, owner: PublicKey): Promise<boo
 }
 
 /**
- * Gives the attendee 1 attendance token, in one transaction paid by the organizer:
+ * Gives the attendee 1 token of this event's badge, in one transaction:
  *  1. create the attendee's token account for this event if it doesn't exist yet
- *  2. mint exactly 1 token into it (the organizer is the only one allowed to mint)
+ *  2. mint exactly 1 token into it
+ * The organizer wallet pays the fee and the rent. The club that issued the badge (`issuer`) is
+ * the only one allowed to mint it, so its key signs too. Without `issuer`, the organizer wallet
+ * is the issuer (the default club).
  * Because the mint is NonTransferable, the attendee can never send this token to anyone.
  */
-export async function mintAttendance(mint: PublicKey, owner: PublicKey): Promise<string> {
+export async function mintAttendance(mint: PublicKey, owner: PublicKey, issuer?: Keypair): Promise<string> {
   const organizer = getOrganizerKeypair();
+  const club = issuer ?? organizer;
   const connection = getConnection();
   const ata = attendeeTokenAccount(mint, owner);
 
@@ -93,9 +97,9 @@ export async function mintAttendance(mint: PublicKey, owner: PublicKey): Promise
       TOKEN_2022_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID,
     ),
-    createMintToInstruction(mint, ata, organizer.publicKey, 1, [], TOKEN_2022_PROGRAM_ID),
+    createMintToInstruction(mint, ata, club.publicKey, 1, [], TOKEN_2022_PROGRAM_ID), // the club is the mint authority
   );
-  tx.sign(organizer);
+  tx.sign(...uniqueSigners(organizer, club));
 
   const signature = await connection.sendRawTransaction(tx.serialize());
   const result = await connection.confirmTransaction(

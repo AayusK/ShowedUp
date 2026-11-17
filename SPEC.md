@@ -1,54 +1,59 @@
 # ShowedUp — Spec
 
-**Practice hackathon (UBC 2026 prep) · Track: Consumer Apps · Chain: Solana devnet · Started as a demo (Nov 4); now in real use by one club, live at https://showedup-phi.vercel.app**
+**UBC 2026 hackathon · Track: Consumer Apps · Best use of Solana · QuickNode Streams bounty · Chain: Solana devnet · Started as an attendance demo (Nov 4), in real use by one club at https://showedup-phi.vercel.app, now a track record across clubs**
 
 ## Problem
-Student clubs track attendance in spreadsheets. They're easy to fake, and they disappear when officers graduate. Students have no portable proof that they were active members, which matters for leadership roles, references and sponsor perks.
+Students do real work for clubs: they mentor, speak, volunteer and run events. The proof sits in one club's spreadsheet or one officer's memory, and it disappears when that officer graduates. When the student approaches a second club, that club can't check any of it, so mentors and leads get picked on word of mouth.
 
 ## User
-- **Attendee:** a student at a club meeting with a phone and Phantom. They don't need SOL and don't need to understand crypto.
-- **Organizer:** a club officer with a laptop and projector who wants a one-click way to take attendance.
+- **Student:** owns their track record. A phone and an email sign-in (or Phantom) is enough. They don't need SOL and don't need to understand crypto.
+- **Issuing club officer:** records who showed up and what people did, from the club's own Solana wallet.
+- **Deciding club officer:** posts an opening with a rule and picks people from records they can verify themselves.
+- **Registry admin:** creates clubs and marks the real ones as verified.
 
 ## Core feature
-The organizer creates an event and a rotating QR code appears. Attendees scan it, connect Phantom and tap **Claim**. Each attendee receives one **soulbound attendance token** for that event. A profile page reads their attendance history from the chain and shows a perk tier: 1 = Showed Up, 3 = Regular, 5 = Core Member.
+A club officer awards **role badges** (Attendee, Volunteer, Speaker, Mentor, Organizer, Officer) from the club's own wallet: attendance through the rotating QR code, contributions by picking people who checked in. The student's **track record** page groups those badges by club and term, each one linked to Solana. The student shares it with a second club. That club posts an opening with a rule ("1 or more Mentor badges from a verified club"), the student checks whether they qualify and applies, and the officer accepts from a record nobody had to take on trust.
+
+Two rules for every screen: we say **track record**, and records are **positive only**. A club can take back a badge it issued by mistake; nobody can add a negative mark.
 
 ## Why blockchain
-- **Portable and permanent:** attendance lives in the student's wallet, not a club spreadsheet. Any org or sponsor can verify it without asking us.
-- **Can't be faked or traded:** Token-2022 **NonTransferable** extension (soulbound).
-- **Gasless for users:** the organizer key pays all fees and does all minting.
+- **The student owns it:** badges live in the student's wallet, not in any club's database. They outlast officers, clubs and this app.
+- **Anyone can check who issued it:** each badge's address is derived from the issuing club's wallet, so only that club could have created it. A look-alike from another wallet shows as "Unverified issuer" and isn't counted.
+- **Can't be traded or bought:** Token-2022 **NonTransferable** extension (soulbound).
+- **Free for users:** the organizer wallet pays every fee. Students and clubs never need SOL.
 
 ## On-chain vs off-chain
-| On-chain (Solana devnet) | Off-chain (Next.js server) |
+| On-chain (Solana devnet) | Off-chain (Next.js server + Supabase) |
 |---|---|
-| One Token-2022 mint per event: decimals 0, NonTransferable, organizer is mint authority. Events created from Nov 16 on also carry Token-2022 metadata in the mint: name, symbol `SHOWEDUP`, `date`, `location` | Event list `{id, name, starts_at, location, mint}` in Supabase (`events` table); per-(event, wallet) claim lock + log in `claims` |
-| Each claim: create the attendee's ATA if needed, then mint 1 token. The organizer pays. | Rotating claim code: `HMAC(EVENT_SECRET, eventId + floor(now/30s))`, 6 chars. The current and previous windows are accepted. |
-| Attendance = token balance > 0 for that event's mint (the source of truth for profiles). Profiles read each badge's name and date from the mint and accept only mints whose mint authority is the organizer | Organizer page gated by the `ORGANIZER_PASSWORD` env var. The organizer key comes from `ORGANIZER_SECRET_KEY`. |
+| One Token-2022 mint per badge: 0 decimals, NonTransferable, Permanent Delegate (so the issuing club can revoke), the club's wallet is mint authority. Its address is derived from the club's wallet and the badge id. | `clubs`: id, name, issuer address, passcode hash, verified. Club keys are never stored: each is derived from `CLUB_KEY_SECRET` and the club id. |
+| Metadata in the mint: name, symbol `SHOWEDUP`, `date`, `location`, `id`, `kind` (attendance or contribution), `role`, `club`. **Never a student's name.** | `events` (one row per badge, with its club, kind and role), `claims` (the per-wallet lock and log), `members` (wallet → display name, shown only to officers). |
+| Each award: create the student's token account if needed, mint 1. The club's key signs as the authority, the organizer wallet pays. | Rotating claim code: `HMAC(EVENT_SECRET, eventId + 30 s window)`, 6 characters. Claims and applications need a wallet signature. |
+| The track record is read from the chain: every token the wallet holds whose issuer is a verified club. | `openings` and `applications`; `chain_claims`, filled live by a QuickNode Stream watching devnet. |
 
-API: `POST/GET /api/events`, `GET /api/events/[id]/code`, `POST /api/claim`, `GET /api/profile/[wallet]`.
+API: `GET/POST /api/clubs`, `GET/POST /api/events`, `POST /api/events/[id]/award`, `POST /api/claim`, `GET /api/profile/[wallet]`, `/api/openings`, `GET /api/feed`.
 
-## Demo script (90 s)
-1. Organizer: `/organizer` → **Create event** "Builders Meeting — Nov 4" → big QR appears.
-2. Attendee (Phantom in-app browser): scan → **Connect wallet** → **Claim**.
-3. Success screen shows a check mark, "You showed up to …" and a Solana Explorer (devnet) tx link.
-4. `/profile/<wallet>`: a pre-seeded wallet with 4 past meetings moves to 5 and **Core Member** unlocks live.
-5. Claiming again shows "Already claimed". An expired code shows "Code expired, scan again."
+## Demo script (2 min)
+1. The admin creates two verified clubs.
+2. An officer of the first club creates a workshop and awards a **Mentor** badge to a student who checked in.
+3. The student's track record shows it under that club and term, with a link to Solana.
+4. The second club posts "Hackathon mentor: 1 or more Mentor badges from a verified club". The student checks, qualifies and applies.
+5. The second club's officer sees the application with the verified record and accepts.
+6. A fake Mentor badge from a random wallet shows as "Unverified issuer". The first club revokes a badge and it disappears from the record.
 
 ## Parts
-0. Setup: Next.js + TS + Tailwind, Solana deps, `.gitignore`/`.env.example`, `scripts/create-organizer.ts`, git
-1. Wallet connect (devnet provider, header button, address + SOL balance)
-2. Create event (organizer page, NonTransferable mint, event list with Explorer links)
-3. Rotating QR (`/organizer/[id]`, big QR, code text, 30 s countdown)
-4. Claim (`/claim/[eventId]`, mint 1, success and error states, mobile-first)
-5. Profile + perks (`/profile/[wallet]`, tiers, progress to the next tier)
-6. Demo prep (seed script, home page, README, deployment)
-Stretch: mint metadata, live claimers list, Verify page.
+0. Spec (this file)
+1. Many clubs, each with its own issuer wallet; a registry admin; badges whose address proves the issuer
+2. Role badges and "Award contribution"
+3. Track record page: by club and term, counts by role, share link and QR
+4. Openings with a rule: check, apply with a signature, accept or decline
+5. Revocation, the fake-issuer demo script, the live feed across clubs (QuickNode Streams)
 
-## Decisions made (where the prompt left a choice)
-- **Next.js 15 App Router** via `create-next-app`, with Tailwind v4 (the current default).
-- **Webpack, not Turbopack:** Windows Application Control on our dev laptop blocks Next's native SWC binary. Next falls back to WASM, which Turbopack doesn't support, so `dev`/`build` drop `--turbopack`.
-- **Scripts run with `tsx`** (`npx tsx scripts/…`). It's simpler than ts-node with ESM.
-- **Secret key format:** `create-organizer.ts` prints a base58 key. The server accepts either base58 or a JSON array.
-- **RPC:** server-only `RPC_URL` (a free Helius devnet URL); falls back to `https://api.devnet.solana.com`. The browser never calls Solana directly.
-- **Event IDs:** short random slugs (8 chars). They're used in URLs and the HMAC input.
-- **Organizer auth:** the password is sent as an `x-organizer-password` header on create-event. The code endpoint also requires it, so attendees can't fetch codes themselves.
-- **Deployment (final):** Vercel + Supabase (CryptoClub org). Started on the organizer laptop + a Cloudflare tunnel for the Nov 4 demo, then moved to hosting for real use. Claims also require a Phantom `signMessage` to prove wallet ownership, and the QR opens the claim page inside Phantom.
+## Decisions made
+- **Stack unchanged:** Next.js 15 App Router, Webpack, `@solana/web3.js` v1 + spl-token 0.4, Supabase on the server only, Vercel.
+- **Club wallets are derived, not stored:** `HMAC-SHA256(CLUB_KEY_SECRET, "club:" + id)` is the key's 32-byte seed. The server holds that secret, so whoever runs the server could issue as any club; a club holding its own key is future work.
+- **The organizer wallet pays every fee**, so the QuickNode filter (fee payer) keeps catching every award from every club.
+- **Legacy club:** events from before clubs existed belong to one default club whose issuer is the organizer wallet; `ORGANIZER_PASSWORD` is its passcode and the registry admin password.
+- **Auth:** every club action sends `x-club-id` + `x-organizer-password`; passcodes are stored as scrypt hashes with a per-club salt.
+- **Privacy:** names stay in the database and are shown only to officers: of a club the student checked in to, or one they applied to (applying is the consent).
+- **Tiers** (1 = Showed Up, 3 = Regular, 5 = Core Member) still count attendance only.
+- **Out of scope:** payments, voting, a custom Solana program, the Solana Attestation Service, mainnet.

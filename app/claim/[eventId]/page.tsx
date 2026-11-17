@@ -1,4 +1,6 @@
 import { getEvent } from "@/lib/server/events";
+import { eventClubId } from "@/lib/server/auth";
+import { getClub } from "@/lib/server/clubs";
 import ClaimView from "./ClaimView";
 
 export const dynamic = "force-dynamic";
@@ -14,5 +16,6 @@ export default async function Page({
   const { c } = await searchParams;
   const event = await getEvent(eventId);
   const code = typeof c === "string" ? c.trim().toUpperCase() : "";
-  return <ClaimView event={event} code={code} />;
+  const club = event ? await getClub(eventClubId(event)).catch(() => null) : null;
+  return <ClaimView event={event} code={code} clubName={club?.name ?? "ShowedUp"} />;
 }
