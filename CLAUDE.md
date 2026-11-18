@@ -238,6 +238,9 @@ Possible next work (ask before starting any of it):
 - **Code sharing:** a screenshot of the code works for up to about 60 s. Accepted; noted in the README.
 - **Removed** `@solana/wallet-adapter-wallets` (Nov 16).
 - **Sign-in:** Privy for email / Google with an embedded Solana wallet; Phantom stays as an option.
+- **Receipts instead of tokens (Nov 17):** new events mint no tokens; only confirmed contributions
+  touch Solana, as a salted-hash memo signed by the club's key. Records include the student's
+  wallet. Details in `SPEC.md` → Decisions made. Don't add new token features.
 
 ## 8. Gotchas
 

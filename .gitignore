@@ -24,5 +24,8 @@ next-env.d.ts
 .playwright-mcp/
 .claude/settings.local.json
 
+# sample record files from `npm run receipt:demo`
+*.receipt.json
+
 # local working log, not published
 PROMPTS.md

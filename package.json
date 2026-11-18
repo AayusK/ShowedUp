@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "organizer": "tsx scripts/create-organizer.ts",
-    "seed": "tsx --conditions=react-server scripts/seed.ts"
+    "seed": "tsx --conditions=react-server scripts/seed.ts",
+    "receipt:demo": "tsx --conditions=react-server scripts/receipt-demo.ts",
+    "receipt:verify": "tsx scripts/verify-receipt.ts"
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.51.4",
