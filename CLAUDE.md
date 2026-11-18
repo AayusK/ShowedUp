@@ -66,7 +66,13 @@ secret key can read or write them.
 | `/organizer/[id]` | `app/organizer/[id]/CheckinView.tsx` | Rotating QR (Phantom browse link), 30 s countdown, live "N people showed up", "Who’s here" names list |
 | `/claim/[eventId]?c=` | `app/claim/[eventId]/ClaimView.tsx` | Name (first claim per wallet) + sign message → claim; ready / success / already claimed / expired screens |
 | `/profile/[wallet]` | `app/profile/[wallet]/ProfileView.tsx` | On-chain attendance + tier; `me`/`demo` = connected wallet |
-| `/verify` | `app/verify/VerifyView.tsx` | Look up any wallet (linked from My attendance, not the header) |
+| `/verify` | `app/verify/VerifyView.tsx` | Look up any wallet (linked from My track record, not the header) |
+| `/organizer/[id]` (role badge) | `app/organizer/[id]/RecipientsView.tsx` | Who has a contribution badge, "Award to more people", Revoke |
+| `/openings/[id]` | `app/openings/[id]/OpeningView.tsx` | Opening with a rule: check, apply with a wallet signature |
+
+Track-record routes (`app/api/`): `GET/POST clubs`, `PATCH clubs/[id]` (admin, verify), `POST events/[id]/award`,
+`POST events/[id]/revoke` (club passcode; burns as permanent delegate), `GET/POST openings`,
+`openings/[id]/{check,apply,applications}`, `GET feed` (live feed across clubs, no names).
 
 API routes (`app/api/`): `GET/POST events` (`?counts=1` adds attendee counts from mint supply),
 `GET events/[id]/code` (password), `GET events/[id]/attendees` (password; names), `POST claim` (saves the name),
@@ -79,7 +85,8 @@ mint), `claim.ts` (signature check, mint 1), `code.ts` (rotating codes), `profil
 `counts.ts`, `members.ts` (names, attendee list), `auth.ts` (constant-time password check), `organizer.ts` (keypair).
 
 Scripts: `npm run organizer` (create the organizer key), `npm run seed -- <wallet> [--target N]`
-(gives a wallet up to N of 4 seeded past events; idempotent). Scripts that import `lib/server/*`
+(gives a wallet up to N of 4 seeded past events; idempotent), `npm run fake-badge -- <wallet>
+[--club "<name>"]` (demo: a look-alike Mentor badge from a random wallet; writes nothing to Supabase). Scripts that import `lib/server/*`
 run with `tsx --conditions=react-server` (already set in `package.json`).
 
 **Design reference:** the original visual demo (`app/demo.tsx`, deleted; it's in git history)
@@ -215,6 +222,13 @@ was tested by the owner before it was committed):**
   existing state; nothing server-side changed.
 - Chosen for the hackathon: Consumer Apps track, Best use of Solana, QuickNode Streams bounty.
 
+**Track record across clubs (Nov 17, branch `feat/track-record` → PR #1, merged; then
+`feat/track-record-wave-b`):** Step 0 spec; Step 1 many clubs, each with a derived issuer wallet
+and seed-derived badge addresses; Step 2 role badges and "Award contribution"; Step 3 the track
+record page by club and term; Step 4 openings with a rule; Wave B: revocation (permanent delegate
+burn + `claims.revoked_at`), `npm run fake-badge`, and the live feed across clubs (`/api/feed`).
+Schema: `db/01_clubs.sql` … `db/04_revocation.sql`, each safe to run twice.
+
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's
 constraints, progress log) is in [`docs/UI-AUDIT.md`](docs/UI-AUDIT.md). Read it before any UI
 work. The owner picks which items to do; nothing from it is implemented until they say so, and
@@ -241,6 +255,16 @@ Possible next work (ask before starting any of it):
 - **Receipts instead of tokens (Nov 17):** new events mint no tokens; only confirmed contributions
   touch Solana, as a salted-hash memo signed by the club's key. Records include the student's
   wallet. Details in `SPEC.md` → Decisions made. Don't add new token features.
+- **Clubs:** each club's keypair is `HMAC-SHA256(CLUB_KEY_SECRET, "club:" + id)` as the seed, never
+  stored. The organizer pays every fee; the club key signs only as authority.
+- **Badge addresses:** new mints live at `createWithSeed(clubIssuer, eventId, TOKEN_2022_PROGRAM_ID)`,
+  so only that club could have created them (`judgeBadge` in `lib/server/profile.ts` re-derives it).
+  Older default-club badges count only if the `events` table lists them.
+- **Revocation:** new mints have Permanent Delegate = the club's issuer; revoking burns the token
+  and sets `claims.revoked_at`. Older badges can't be revoked. A revoked badge can't be re-awarded
+  to the same wallet (the claims row stays as the lock).
+- **Copy:** say "track record", never "background check". Records are positive only; no student
+  name on-chain (club names are fine).
 
 ## 8. Gotchas
 

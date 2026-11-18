@@ -9,6 +9,7 @@
     "lint": "eslint",
     "organizer": "tsx scripts/create-organizer.ts",
     "seed": "tsx --conditions=react-server scripts/seed.ts",
+    "fake-badge": "tsx --conditions=react-server scripts/fake-badge.ts",
     "receipt:demo": "tsx --conditions=react-server scripts/receipt-demo.ts",
     "receipt:verify": "tsx scripts/verify-receipt.ts"
   },
