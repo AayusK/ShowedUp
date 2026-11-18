@@ -91,7 +91,7 @@ run with `tsx --conditions=react-server` (already set in `package.json`).
 
 **Design reference:** the original visual demo (`app/demo.tsx`, deleted; it's in git history)
 set the look. Keep its look, copy and CSS class names (`app/globals.css`, plain CSS rather than
-Tailwind utilities). Don't redesign anything. Navigation links must be clearly visible (larger
+Tailwind utilities). **2026-11-18: the owner now allows a real visual and structural redesign (this replaces "Don't redesign anything"); still plain CSS in `globals.css`, one step at a time.** Navigation links must be clearly visible (larger
 and/or green): see the "Visible links" block at the end of `globals.css`. Files contain UTF-8
 characters like `·`, `→`, `↗`, `’`; keep the encoding intact.
 

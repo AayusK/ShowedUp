@@ -8,7 +8,7 @@ each batch (see CLAUDE.md section 1).
 
 ## Constraints for Phase 2 (from the owner, non-negotiable)
 
-- Not a redesign. Keep the visual identity: colors, fonts, layout, copy tone, CSS class names.
+- ~~Not a redesign. Keep the visual identity: colors, fonts, layout, copy tone, CSS class names.~~ **2026-11-18: lifted by the owner. A real visual and structural redesign is allowed; the other constraints below still apply.**
 - Styling stays in plain CSS in `app/globals.css` (no Tailwind utility rewrites, no CSS-in-JS).
 - No new dependencies without asking first.
 - Frontend only: don't touch `app/api/*`, `lib/server/*`, or any Solana/transaction logic.
