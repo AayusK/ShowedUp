@@ -21,7 +21,7 @@ const COUNT_POLL_MS = 8000;
 const WINDOW_S = 30;
 const ROSTER_POLL_MS = 4000;
 
-export default function CheckinView({ event, club }: { event: EventRecord | null; club: { id: string; name: string } }) {
+export default function CheckinView({ event, club, siteUrl }: { event: EventRecord | null; club: { id: string; name: string }; siteUrl?: string }) {
   // With email / Google sign-in on, attendees don't need Phantom, so the QR opens the claim page itself.
   const signInEnabled = useEmbeddedWallet().enabled;
   // The officer's sign-in. It must be for the club this event belongs to.
@@ -43,7 +43,10 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
   const [countBump, setCountBump] = useState(false);
   const prevAttendees = useRef<number | null>(null);
 
-  useEffect(() => { setOrigin(window.location.origin); }, []);
+  // The QR code points phones at PUBLIC_SITE_URL when it's set, otherwise at this page's own
+  // address. A phone can't open "localhost", so that case gets a warning instead of a dead QR.
+  useEffect(() => { setOrigin(siteUrl ?? window.location.origin); }, [siteUrl]);
+  const localOnly = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(origin);
 
   // Use the sign-in saved on the organizer page if it is for this event's club; otherwise ask.
   useEffect(() => {
@@ -230,6 +233,7 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
         {!password && checkedSaved
           ? <button className="text-link qr-link" onClick={() => { setAccessError(""); setAccessModal(true); }}>Enter club passcode <Icon name="arrow" size={16}/></button>
           : claimUrl && <a href={claimUrl} target="_blank" rel="noreferrer" className="text-link qr-link">Open attendee screen <Icon name="arrow" size={16}/></a>}
+        {localOnly && <p className="form-error" role="alert">Phones can’t open “localhost”, so this QR code won’t work on a phone. Open this page from the Vercel link (or a tunnel link), or set PUBLIC_SITE_URL on the server.</p>}
         <small className="qr-disclaimer">Each code works for up to a minute, then scan again.</small>
       </div>
       <aside className="roster-panel" aria-label="Who’s here"><div className="roster-head"><h2>Who’s here</h2>{roster && <span className="roster-count" aria-live="polite">{roster.length}</span>}</div>

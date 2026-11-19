@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { Badge } from "@/components/Badge";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -53,6 +54,7 @@ function todayLocal() {
 }
 
 export default function OrganizerView() {
+  const router = useRouter();
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   // Which club the officer is signed in to (and its passcode). Signed out, the page shows the
@@ -157,7 +159,9 @@ export default function OrganizerView() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        // Straight to the new event's check-in QR code.
         setCreateModal(false);
+        if (data.event?.id) { router.push(`/organizer/${data.event.id}`); return; }
         await loadEvents();
         return;
       }

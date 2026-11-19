@@ -17,13 +17,23 @@ import { ProfileRecord } from "./ProfileRecord";
 const SELF_ALIASES = new Set(["me", "demo"]);
 
 export default function ProfileView({ walletParam }: { walletParam: string }) {
-  const { publicKey } = useWallet();
+  const { publicKey, wallet, connecting } = useWallet();
   const { setVisible } = useWalletModal();
   // "Me" is a connected Phantom wallet, or the wallet that came with an email / Google sign-in.
   const embedded = useEmbeddedWallet();
   const connectedWallet = publicKey?.toBase58() ?? embedded.address ?? null;
   // Still finding out whether the visitor is signed in, or their wallet is being created.
   const signInPending = embedded.enabled && !publicKey && (!embedded.ready || (embedded.authenticated && !embedded.address));
+  // Phantom reconnects on its own a moment after the page loads (autoConnect). Until it has had
+  // that moment, don't tell a returning user to "connect your wallet". The remembered wallet is
+  // only read after the first render, so give everyone a short grace period, and a longer one
+  // when a wallet was remembered.
+  const [graceOver, setGraceOver] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setGraceOver(true), wallet ? 4000 : 800);
+    return () => window.clearTimeout(timer);
+  }, [wallet]);
+  const walletRestoring = !publicKey && (connecting || !graceOver);
   const isSelfRoute = SELF_ALIASES.has(walletParam);
   const target = isSelfRoute ? connectedWallet : walletParam;
 
@@ -42,8 +52,8 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
   const shell = (body: ReactNode) => <><SiteHeader view="profile" /><main className="shell">{body}</main><SiteFooter /></>;
   const message = (symbol: string, title: string, text: string, action?: ReactNode) => shell(<div className="center-page"><div className="claim-panel"><div className="large-symbol"><Icon name={symbol} size={32}/></div><h1>{title}</h1><p>{text}</p>{action}</div></div>);
 
-  if (isSelfRoute && !connectedWallet && signInPending) {
-    return message("spark", "One moment…", "Checking whether you’re signed in.");
+  if (isSelfRoute && !connectedWallet && (signInPending || walletRestoring)) {
+    return message("spark", "One moment…", "Looking for your wallet.");
   }
   if (isSelfRoute && !connectedWallet && embedded.enabled) {
     return message("wallet", "Your presence, collected.", "Sign in to see the events you’ve shown up to.", <><button className="button primary full" style={{marginTop: 25}} onClick={() => embedded.login()}>Sign in <Icon name="arrow" size={17}/></button><p className="claim-name-known" style={{marginTop: 18}}>Have a Phantom wallet? <button type="button" className="text-link" onClick={() => setVisible(true)}>Connect it instead</button></p><Link className="text-link" href="/verify" style={{marginTop: 4}}>Or verify any wallet <Icon name="arrow" size={16}/></Link></>);
