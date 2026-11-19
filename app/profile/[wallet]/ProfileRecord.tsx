@@ -143,8 +143,22 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
         <div className="profile-record-tier">
           {profile.tier && <strong>{profile.tier}</strong>}
           {profile.nextTier && <span>{eventCount(profile.nextTier.remaining)} to {profile.nextTier.name}</span>}
+          <TierProgress nextTier={profile.nextTier} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** A thin bar that fills toward the next tier (full once the top tier is reached). */
+function TierProgress({ nextTier }: { nextTier: { name: string; min: number; remaining: number } | null }) {
+  const attended = nextTier ? nextTier.min - nextTier.remaining : 1;
+  const goal = nextTier ? nextTier.min : 1;
+  const percent = Math.max(0, Math.min(100, Math.round((attended / goal) * 100)));
+  return (
+    <div className="profile-record-tier-track" role="progressbar" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={attended}
+      aria-label={nextTier ? `${attended} of ${goal} events toward ${nextTier.name}` : "Top tier reached"}>
+      <div style={{ width: `${percent}%` }} />
     </div>
   );
 }

@@ -359,6 +359,9 @@ body:has(.profile-record) { background: #f7f8fa; }
 .profile-record-notice { padding: 14px 19px; }
 .profile-record-tier { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 12px 2px 0; }
 .profile-record-tier strong { color: var(--profile-ink); }
+.profile-record-tier-track { flex-basis: 100%; height: 6px; border-radius: 6px; background: var(--profile-line); overflow: hidden; }
+.profile-record-tier-track > div { height: 100%; border-radius: 6px; background: var(--profile-green); transition: width .6s ease; }
+@media (prefers-reduced-motion: reduce) { .profile-record-tier-track > div { transition: none; } }
 @media (max-width: 520px) {
   .profile-record-person { gap: 8px 10px; padding-inline: 13px; }
   .profile-record-verify { margin-left: 0; }

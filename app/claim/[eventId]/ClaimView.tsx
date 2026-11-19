@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
@@ -61,6 +61,19 @@ export default function ClaimView({ event, code, clubName }: { event: EventRecor
   }, [walletAddress]);
   const askName = hasWallet && nameKnown !== null && (!nameKnown || editingName);
 
+  // One tap to claim: when "Connect wallet / Sign in to claim" was tapped, carry on to the
+  // signature as soon as the wallet is ready, instead of making the attendee tap Claim again.
+  // A wallet we have no name for still needs the name typed first, so we focus that box instead.
+  const [claimAfterConnect, setClaimAfterConnect] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const doClaimRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (!claimAfterConnect || !hasWallet || nameKnown === null || busy !== null || claim !== "ready") return;
+    setClaimAfterConnect(false);
+    if (askName) nameInputRef.current?.focus();
+    else doClaimRef.current();
+  }, [claimAfterConnect, hasWallet, nameKnown, askName, busy, claim]);
+
   if (!event) {
     return <><SiteHeader view="claim" /><main className="shell"><div className="center-page"><Link href="/" className="back-link">← Back to overview</Link><div className="claim-panel"><div className="large-symbol neutral-symbol"><Icon name="calendar" size={32}/></div><h1>We couldn’t find that event.</h1><p>Scan the QR code on the organizer’s screen to check in.</p></div></div></main><SiteFooter /></>;
   }
@@ -68,6 +81,7 @@ export default function ClaimView({ event, code, clubName }: { event: EventRecor
   async function doClaim() {
     if (!event) return;
     if (!hasWallet) {
+      setClaimAfterConnect(true);
       if (embedded.enabled) embedded.login();
       else setVisible(true);
       return;
@@ -119,6 +133,8 @@ export default function ClaimView({ event, code, clubName }: { event: EventRecor
     }
   }
 
+  doClaimRef.current = () => { void doClaim(); };
+
   const tile = dateTile(event.date);
   const profileHref = claimedWallet ? `/profile/${claimedWallet}` : "/profile/me";
   const buttonLabel = busy === "signing" ? (usingEmbedded ? "Confirming it’s you…" : "Approve in your wallet…") : busy === "claiming" ? "Claiming your attendance…" : hasWallet ? "Claim attendance" : settingUp ? "Setting up your account…" : embedded.enabled ? "Sign in to claim" : "Connect wallet to claim";
@@ -129,7 +145,7 @@ export default function ClaimView({ event, code, clubName }: { event: EventRecor
   return <><SiteHeader view="claim" />
   <main className="shell"><div className="center-page"><Link href="/" className="back-link">← Back to overview</Link><div className="claim-panel" key={claim}><div className={`large-symbol${claim === "expired" ? " neutral-symbol" : ""}${claim === "success" ? " pop" : ""}`}><Icon name={claim === "success" || claim === "duplicate" ? "check" : "calendar"} size={32}/></div><Badge>{claim === "success" ? "Attendance confirmed" : clubName}</Badge><h1>{claim === "success" ? "You showed up." : claim === "duplicate" ? "Already part of the story." : claim === "expired" ? "Let’s try that again." : "Good to see you here."}</h1><p>{claim === "success" ? "A moment of your time. A permanent part of your story." : claim === "duplicate" ? "You’ve already claimed attendance for this event." : claim === "expired" ? "This code has expired. Scan the organizer’s latest QR code to check in." : "One tap to make this moment yours."}</p><div className="claim-event"><div className="date-tile"><small>{tile.month}</small>{tile.day}</div><div><h3>{event.name}</h3><p>{formatDay(event.date)} · {formatTime(event.date)}</p></div><Icon name="shield"/></div>
     {claim === "ready" && offerPhantom && !embedded.enabled && <><a className="button primary full" href={phantomLink}>Open in Phantom to claim<Icon name="wallet" size={17}/></a><small className="claim-note">Claiming works inside the Phantom app. No Phantom yet? This link takes you to the download.</small></>}
-    {claim === "ready" && (!offerPhantom || embedded.enabled) && <>{askName && <label className="field claim-name">Your name<input type="text" placeholder="How your organizer will see you" autoComplete="name" maxLength={NAME_MAX} value={name} onChange={e=>setName(e.target.value)} disabled={busy !== null}/><small>{nameKnown ? "This replaces the name we have for this wallet." : "Only asked once. We’ll remember it for this wallet."}</small></label>}{hasWallet && nameKnown && !editingName && <p className="claim-name-known">Welcome back. <button type="button" className="text-link" onClick={()=>setEditingName(true)}>Change your name</button></p>}<button className="button primary full" onClick={doClaim} disabled={busy !== null || settingUp || (!hasWallet && embedded.enabled && !embedded.ready)}>{buttonLabel}<Icon name={hasWallet || embedded.enabled ? "arrow" : "wallet"} size={17}/></button>{error && <p className="form-error" role="alert">{error}</p>}<small className="claim-note">{busy === "signing" && !usingEmbedded ? "Signing is free and doesn’t send anything. It just proves this wallet is yours." : !hasWallet && embedded.enabled ? "Use your email or Google account. No app to install, no fees." : "No fees for you. Your organizer has it covered."}</small>{phantomOption && <p className="claim-name-known">Have a Phantom wallet? {offerPhantom ? <a className="text-link" href={phantomLink}>Open in Phantom</a> : <button type="button" className="text-link" onClick={()=>setVisible(true)}>Connect it instead</button>}</p>}{hasWallet && busy === null && <p className="claim-name-known">{usingEmbedded ? "Signed in" : "Connected"} · {shortWallet} <button type="button" className="text-link" onClick={()=>{ setError(""); if (usingEmbedded) void embedded.logout(); else void disconnect(); }}>{usingEmbedded ? "Sign out" : "Disconnect"}</button></p>}</>}
+    {claim === "ready" && (!offerPhantom || embedded.enabled) && <>{askName && <label className="field claim-name">Your name<input ref={nameInputRef} type="text" placeholder="How your organizer will see you" autoComplete="name" maxLength={NAME_MAX} value={name} onChange={e=>setName(e.target.value)} disabled={busy !== null}/><small>{nameKnown ? "This replaces the name we have for this wallet." : "Only asked once. We’ll remember it for this wallet."}</small></label>}{hasWallet && nameKnown && !editingName && <p className="claim-name-known">Welcome back. <button type="button" className="text-link" onClick={()=>setEditingName(true)}>Change your name</button></p>}<button className="button primary full" onClick={doClaim} disabled={busy !== null || settingUp || (!hasWallet && embedded.enabled && !embedded.ready)}>{buttonLabel}<Icon name={hasWallet || embedded.enabled ? "arrow" : "wallet"} size={17}/></button>{error && <p className="form-error" role="alert">{error}</p>}<small className="claim-note">{busy === "signing" && !usingEmbedded ? "Signing is free and doesn’t send anything. It just proves this wallet is yours." : !hasWallet && embedded.enabled ? "Use your email or Google account. No app to install, no fees." : "No fees for you. Your organizer has it covered."}</small>{phantomOption && <p className="claim-name-known">Have a Phantom wallet? {offerPhantom ? <a className="text-link" href={phantomLink}>Open in Phantom</a> : <button type="button" className="text-link" onClick={()=>{ setClaimAfterConnect(true); setVisible(true); }}>Connect it instead</button>}</p>}{hasWallet && busy === null && <p className="claim-name-known">{usingEmbedded ? "Signed in" : "Connected"} · {shortWallet} <button type="button" className="text-link" onClick={()=>{ setError(""); if (usingEmbedded) void embedded.logout(); else void disconnect(); }}>{usingEmbedded ? "Sign out" : "Disconnect"}</button></p>}</>}
     {(claim === "success" || claim === "duplicate") && <><Link className="button primary full" href={profileHref}>View my attendance<Icon name="arrow" size={17}/></Link>{claim === "success" && txSignature && <a className="tx-link" href={explorerLink(txSignature, "tx")} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>View transaction on Solana Explorer</a>}</>}
     {claim === "expired" && <Link className="button primary full" href="/">Back to overview<Icon name="arrow" size={17}/></Link>}
     <div className="soulbound-note"><Icon name="shield" size={15}/> Yours to keep. Nontransferable by design.</div></div></div></main><SiteFooter /></>;

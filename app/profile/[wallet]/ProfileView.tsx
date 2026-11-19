@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { Icon } from "@/components/Icon";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -17,13 +18,23 @@ import { ProfileRecord } from "./ProfileRecord";
 const SELF_ALIASES = new Set(["me", "demo"]);
 
 export default function ProfileView({ walletParam }: { walletParam: string }) {
-  const { publicKey } = useWallet();
+  const { publicKey, wallet, connecting } = useWallet();
   const { setVisible } = useWalletModal();
   // "Me" is a connected Phantom wallet, or the wallet that came with an email / Google sign-in.
   const embedded = useEmbeddedWallet();
   const connectedWallet = publicKey?.toBase58() ?? embedded.address ?? null;
+  // Phantom reconnects on its own after a page load (autoConnect), but not instantly. If a wallet
+  // was used before and is available, give it a moment instead of flashing "Connect your wallet".
+  // The 2 s cap means a reconnect that never happens can't leave the page stuck on "One moment…".
+  const [reconnectGrace, setReconnectGrace] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setReconnectGrace(false), 2000);
+    return () => clearTimeout(t);
+  }, []);
+  const walletAvailable = wallet?.readyState === WalletReadyState.Installed || wallet?.readyState === WalletReadyState.Loadable;
+  const phantomPending = !publicKey && (connecting || (reconnectGrace && walletAvailable));
   // Still finding out whether the visitor is signed in, or their wallet is being created.
-  const signInPending = embedded.enabled && !publicKey && (!embedded.ready || (embedded.authenticated && !embedded.address));
+  const signInPending = phantomPending || (embedded.enabled && !publicKey && (!embedded.ready || (embedded.authenticated && !embedded.address)));
   const isSelfRoute = SELF_ALIASES.has(walletParam);
   const target = isSelfRoute ? connectedWallet : walletParam;
 
