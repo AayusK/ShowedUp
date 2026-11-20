@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { getEvent } from "@/lib/server/events";
 import { eventClubId } from "@/lib/server/auth";
 import { getClub } from "@/lib/server/clubs";
 import { LEGACY_CLUB_ID } from "@/lib/clubs";
 import CheckinView from "./CheckinView";
 import RecipientsView from "./RecipientsView";
+
+export const metadata: Metadata = { title: "Event" };
 
 export const dynamic = "force-dynamic";
 

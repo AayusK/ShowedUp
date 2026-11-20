@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { getEvent } from "@/lib/server/events";
 import { eventClubId } from "@/lib/server/auth";
 import { getClub } from "@/lib/server/clubs";
 import ClaimView from "./ClaimView";
+
+export const metadata: Metadata = { title: "Check in" };
 
 export const dynamic = "force-dynamic";
 

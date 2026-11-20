@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { Icon } from "@/components/Icon";
+import { CopyText } from "@/components/CopyText";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { OrganizerAccessModal } from "@/components/OrganizerAccessModal";
@@ -196,7 +197,7 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
       if (res.ok && data.status === "awarded") { setAddNote({ ok: true, text: `${label} was added. Their badge is on Solana.` }); setAddQuery(""); }
       else if (res.ok) setAddNote({ ok: true, text: `${label} already has this badge.` });
       else if (data.error === "schema_not_ready") setAddNote({ ok: false, text: "Run db/05_manual_attendance.sql in Supabase first, then try again." });
-      else if (data.error === "organizer_unfunded") setAddNote({ ok: false, text: <>The organizer wallet needs devnet SOL. Fund <strong>{data.organizer}</strong> at faucet.solana.com.</> });
+      else if (data.error === "organizer_unfunded") setAddNote({ ok: false, text: <>The organizer wallet needs devnet SOL. Fund <CopyText value={String(data.organizer)}/> at <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">faucet.solana.com</a>.</> });
       else if (data.error === "invalid_wallet") setAddNote({ ok: false, text: "That isn’t a Solana wallet address." });
       else if (res.status === 401) setAddNote({ ok: false, text: "Your officer sign-in has expired. Reload and enter the passcode again." });
       else if (res.status === 409) setAddNote({ ok: false, text: "Already being added. Give it a few seconds." });

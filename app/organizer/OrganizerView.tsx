@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState, type FormEvent, type R
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { CopyText } from "@/components/CopyText";
 import { SiteHeader } from "@/components/SiteHeader";
 import { formatDay } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
@@ -173,7 +174,7 @@ export default function OrganizerView() {
           setAccessModal(true);
           break;
         case "organizer_unfunded":
-          setCreateError(<>The organizer wallet needs devnet SOL. Fund <strong>{data.organizer}</strong> at <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">faucet.solana.com</a>, then try again.</>);
+          setCreateError(<>The organizer wallet needs devnet SOL. Fund <CopyText value={String(data.organizer)}/> at <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">faucet.solana.com</a>, then try again.</>);
           break;
         case "club_key_not_configured":
           setCreateError("This club’s wallet isn’t set up. Check CLUB_KEY_SECRET in the server’s settings.");

@@ -676,3 +676,6 @@ body:has(.profile-record) { background: #f7f8fa; }
 .tr-unverified p,.tr-note{font-size:13px}
 .tr-unverified .event-info h3{font-size:15px}
 .tr-unverified .event-info p{font-size:13px}
+.copy-text{display:inline-flex;align-items:center;gap:6px;max-width:100%;vertical-align:middle}
+.copy-text code{font-size:12px;overflow-wrap:anywhere;background:rgba(0,0,0,.05);border-radius:6px;padding:2px 6px}
+.copy-text button{font-size:12px;font-weight:600;color:#127a55;background:#e3f3eb;border-radius:6px;padding:3px 8px;min-height:26px;flex-shrink:0}
