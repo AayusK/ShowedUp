@@ -32,6 +32,6 @@ export function chatSignInMessage(clubId: string, wallet: string, signedAt: stri
 /** Trims and drops control characters; keeps line breaks only when asked. */
 export function cleanText(raw: unknown, max: number, multiline = false): string {
   if (typeof raw !== "string") return "";
-  const s = raw.replace(multiline ? /[\u0000-\u0009\u000b-\u001f\u007f]/g : /[\u0000-\u001f\u007f]/g, "");
+  const s = raw.replace(/\t/g, " ").replace(multiline ? /[\u0000-\u0008\u000b-\u001f\u007f]/g : /[\n\r]/g, multiline ? "" : " ").replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "");
   return (multiline ? s.replace(/\n{3,}/g, "\n\n") : s.replace(/\s+/g, " ")).trim().slice(0, max);
 }

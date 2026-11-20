@@ -36,7 +36,8 @@ export function issueMemberToken(wallet: string, clubId: string): { token: strin
   const payload = `${wallet}.${clubId}.${exp}`;
   return { token: `${payload}.${sign(payload)}`, expiresAt: new Date(exp).toISOString() };
 }
-function readMemberToken(token: string | null, clubId: string): string | null {
+/** Exported for tests; routes go through chatActor. */
+export function readMemberToken(token: string | null, clubId: string): string | null {
   if (!token) return null;
   const parts = token.split(".");
   if (parts.length !== 4) return null;

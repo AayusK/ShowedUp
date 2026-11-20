@@ -22,7 +22,7 @@ export const CARD_LIMITS = { displayName: 60, headline: 100, school: 80, major: 
 /** Trims, collapses spaces (except in the bio) and drops control characters. */
 function clean(raw: unknown, max: number, multiline = false): string {
   if (typeof raw !== "string") return "";
-  let s = raw.replace(multiline ? /[\u0000-\u0009\u000b-\u001f\u007f]/g : /[\u0000-\u001f\u007f]/g, "");
+  let s = raw.replace(/\t/g, " ").replace(multiline ? /[\u0000-\u0008\u000b-\u001f\u007f]/g : /[\n\r]/g, multiline ? "" : " ").replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "");
   s = multiline ? s.replace(/\n{3,}/g, "\n\n") : s.replace(/\s+/g, " ");
   return s.trim().slice(0, max);
 }
