@@ -754,3 +754,20 @@ body:has(.profile-record) { background: #f7f8fa; }
 .ov-empty{font-size:14px;color:#5f6862;padding:12px 0;border-top:1px solid #eef0ed}
 .ov-pending{align-self:flex-start;margin-top:10px}
 @media (max-width:860px){.ov{grid-template-columns:1fr}}
+
+/* Events tab: attendance trend (2026-11-20). One series, one hue; values on the peak and the latest bar, the rest on hover/focus. */
+.trend{border-radius:16px;padding:12px 18px 10px;background:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.9);box-shadow:0 6px 24px rgba(20,40,30,.06)}
+.trend-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.trend-head .dash-h{margin-top:0}
+.trend-head>span{font-size:13px;color:#5f6862}
+.trend-plot{display:flex;align-items:flex-end;gap:2px;height:120px;padding-top:20px;border-bottom:1px solid #dfe5dc;margin-top:6px}
+.trend-col{position:relative;flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;outline:none;cursor:default}
+.trend-bar{width:min(22px,70%);background:#2c8a5e;border-radius:4px 4px 0 0;transition:background .15s}
+.trend-col:hover .trend-bar,.trend-col:focus-visible .trend-bar{background:#145c3d}
+.trend-val{font-size:12px;font-weight:600;color:#141a16;font-variant-numeric:tabular-nums;margin-bottom:3px}
+.trend-x{position:absolute;bottom:-20px;font-size:11.5px;color:#7a847c;white-space:nowrap}
+.trend{padding-bottom:26px}
+.trend-tip{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#141a16;color:#fff;font-size:12px;padding:5px 8px;border-radius:7px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;z-index:2}
+.trend-col:hover .trend-tip,.trend-col:focus-visible .trend-tip{opacity:1}
+.trend-col:focus-visible{box-shadow:0 0 0 2px #127a55;border-radius:6px}
+@media (max-width:720px){.trend-x{display:none}.trend{padding-bottom:12px}}

@@ -235,6 +235,16 @@ export default function OrganizerView() {
     .sort((a, b) => a.date.localeCompare(b.date));
   const past = (events ?? []).filter((e) => e.kind !== "contribution" && !upcoming.includes(e));
   const roleBadges = (events ?? []).filter((e) => e.kind === "contribution");
+  // Attendance trend on the Events tab: past events with an on-chain count, oldest first, last 12.
+  const trend = past.filter((e) => e.attendees !== undefined).slice(0, 12).reverse();
+  const trendMax = Math.max(0, ...trend.map((e) => e.attendees ?? 0));
+  const trendNote = (() => {
+    if (trend.length < 2) return "";
+    const first = trend[0].attendees ?? 0, last = trend[trend.length - 1].attendees ?? 0;
+    if (last > first) return `Up from ${first} to ${last}`;
+    if (last < first) return `Down from ${first} to ${last}`;
+    return `Steady at ${last}`;
+  })();
   const clubActivity = activity ? activity.items.filter((i) => i.club === (club?.name ?? (clubId === LEGACY_CLUB_ID ? LEGACY_CLUB_NAME : ""))) : null;
   const hosted = (events ?? []).filter((e) => e.kind !== "contribution");
   // Only show check-ins when every event has an on-chain count; never a made-up number.
@@ -336,6 +346,21 @@ export default function OrganizerView() {
         </div>
         {events === null && <ul className="dash-list">{[0, 1, 2].map((i) => <li className="dash-row" key={i}><div className="skeleton" style={{height: 14, width: "40%"}}/></li>)}</ul>}
         {events !== null && events.length === 0 && <p className="dash-empty">{loadError ? "Couldn’t load events. Refresh to try again." : "No events yet. Create one to get a check-in QR code."}</p>}
+        {trend.length >= 2 && <section className="trend" aria-label="People who came to each event">
+          <div className="trend-head"><h2 className="dash-h">Who came, event by event</h2><span>{trendNote}</span></div>
+          <div className="trend-plot" role="list">
+            {trend.map((e, i) => {
+              const n = e.attendees ?? 0;
+              const label = i === trend.length - 1 || n === trendMax;
+              return <div key={e.id} className="trend-col" role="listitem" tabIndex={0} aria-label={`${e.name}, ${formatDay(e.date)}: ${n} ${n === 1 ? "person" : "people"}`}>
+                <span className="trend-tip" aria-hidden="true"><strong>{n}</strong> · {e.name}</span>
+                {label && <span className="trend-val" aria-hidden="true">{n}</span>}
+                <span className="trend-bar" style={{height: `${Math.max(trendMax ? (n / trendMax) * 100 : 0, 2)}%`}}/>
+                <span className="trend-x" aria-hidden="true">{formatDay(e.date).replace(/, \d{4}$/, "")}</span>
+              </div>;
+            })}
+          </div>
+        </section>}
         {upcoming.length > 0 && <><h2 className="dash-h">Next</h2><ul className="dash-list">{upcoming.map((e, i) => eventRow(e, i === 0))}</ul></>}
         {past.length > 0 && <><h2 className="dash-h">Past</h2><ul className="dash-list">{past.map((e) => eventRow(e))}</ul></>}
       </>}
