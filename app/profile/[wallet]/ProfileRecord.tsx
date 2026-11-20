@@ -75,6 +75,32 @@ function useTierUnlock(wallet: string, tier: string | null, isMine: boolean): st
   return unlocked;
 }
 
+/**
+ * The track record in one strip, shown inside the profile header: tier, wallet, a slim progress
+ * bar toward the next tier, and the counts. Replaces the big blue tier card.
+ */
+export function RecordSummary({ profile }: { profile: Profile }) {
+  const clubs = new Set(profile.events.map((e) => e.club.id)).size;
+  return (
+    <div className="rs">
+      <div className="rs-top">
+        <span className="rs-tier">{profile.tier ?? "No tier yet"}</span>
+        <span className="rs-verified"><Icon name="shield" size={13} /> Verified on Solana</span>
+        <span className="rs-wallet">
+          <a href={explorerLink(profile.wallet)} target="_blank" rel="noreferrer" aria-label={`View wallet ${profile.wallet} on Solana Explorer`}>{shortAddress(profile.wallet)} <Icon name="external" size={12} /></a>
+          <CopyWallet wallet={profile.wallet} />
+        </span>
+      </div>
+      <TierProgress profile={profile} />
+      <div className="rs-stats">
+        <span><strong>{profile.count}</strong> {profile.count === 1 ? "event" : "events"}</span>
+        <span><strong>{profile.contributions}</strong> {profile.contributions === 1 ? "contribution" : "contributions"}</span>
+        <span><strong>{clubs}</strong> {clubs === 1 ? "club" : "clubs"}</span>
+      </div>
+    </div>
+  );
+}
+
 export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: boolean }) {
   const unlocked = useTierUnlock(profile.wallet, profile.tier, isMine);
   const clubs = groupTrackRecord(profile.events);
@@ -88,26 +114,6 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
 
   return (
     <div className="rec">
-      <section className="rec-hero">
-        <div className="rec-hero-top">
-          <span>{isMine ? "Your track record" : "Track record"}</span>
-          <span><Icon name="shield" size={13} /> Verified on Solana</span>
-        </div>
-        <h1>{profile.tier ?? "No tier yet"}</h1>
-        <div className="rec-wallet">
-          <a href={explorerLink(profile.wallet)} target="_blank" rel="noreferrer" aria-label={`View wallet ${profile.wallet} on Solana Explorer`}>
-            {shortAddress(profile.wallet)} <Icon name="external" size={12} />
-          </a>
-          <CopyWallet wallet={profile.wallet} />
-        </div>
-        <TierProgress profile={profile} />
-        <div className="rec-stats">
-          <div><strong>{profile.count}</strong><span>{profile.count === 1 ? "event" : "events"}</span></div>
-          <div><strong>{profile.contributions}</strong><span>{profile.contributions === 1 ? "contribution" : "contributions"}</span></div>
-          <div><strong>{clubs.length}</strong><span>{clubs.length === 1 ? "club" : "clubs"}</span></div>
-        </div>
-      </section>
-
       {unlocked && <p className="rec-unlock" role="status"><Icon name="spark" size={18}/><span><strong>{unlocked} unlocked.</strong> Keep showing up.</span></p>}
 
       {profile.partial && <p className="rec-notice" role="status">Some badges may be missing right now. Refresh to try again.</p>}

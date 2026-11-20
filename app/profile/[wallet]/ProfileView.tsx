@@ -11,7 +11,9 @@ import { TrackRecordShare } from "@/components/TrackRecordShare";
 import { TrackRecordUnverified } from "@/components/TrackRecordUnverified";
 import { fetchProfile, type ProfileResult } from "@/lib/profileClient";
 import { useEmbeddedWallet } from "@/lib/embeddedWallet";
-import { ProfileRecord } from "./ProfileRecord";
+import { ProfileRecord, RecordSummary } from "./ProfileRecord";
+import { ProfileCardEditor, ProfileCardHeader } from "./ProfileCardView";
+import type { ProfileCard } from "@/lib/profileCard";
 
 // "/profile/me" (and the older "/profile/demo" links) mean "whoever is connected".
 const SELF_ALIASES = new Set(["me", "demo"]);
@@ -49,6 +51,20 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
     return () => { cancelled = true; };
   }, [target]);
 
+  // The student's public profile card (name, school, bio, LinkedIn…), shown above the record.
+  const [card, setCard] = useState<{ wallet: string; card: ProfileCard | null } | null>(null);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!target) return;
+    let cancelled = false;
+    fetch(`/api/profile-card/${encodeURIComponent(target)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { card: null }))
+      .then((d: { card?: ProfileCard | null }) => { if (!cancelled) setCard({ wallet: target, card: d.card ?? null }); })
+      .catch(() => { if (!cancelled) setCard({ wallet: target, card: null }); });
+    return () => { cancelled = true; };
+  }, [target]);
+  const shownCard = card?.wallet === target ? card.card : null;
+
   const shell = (body: ReactNode, extra = "") => <><SiteHeader view="profile" /><main className={`shell${extra}`}>{body}</main><SiteFooter /></>;
   // Sign-in, loading and error screens use the same card as the claim page.
   const message = (symbol: string, title: string, text: string, action?: ReactNode) => shell(<div className="center-page"><div className="claim-panel"><div className="large-symbol"><Icon name={symbol} size={32}/></div><h1>{title}</h1><p>{text}</p>{action}</div></div>, " claim-v2");
@@ -74,7 +90,9 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
   const { profile } = result;
   const isMine = profile.wallet === connectedWallet;
   return shell(<>
+    <div className="pc-wrap"><ProfileCardHeader card={shownCard} isMine={isMine} onEdit={() => setEditing(true)} summary={<RecordSummary profile={profile} />} /></div>
     <ProfileRecord key={profile.wallet} profile={profile} isMine={isMine} />
+    {editing && isMine && <ProfileCardEditor wallet={profile.wallet} initial={shownCard} onClose={() => setEditing(false)} onSaved={(c) => { setCard({ wallet: profile.wallet, card: c }); setEditing(false); }} />}
     <TrackRecordUnverified badges={profile.unverified ?? []} total={profile.unverifiedTotal ?? 0}/>
     <TrackRecordShare wallet={profile.wallet} isMine={isMine}/>
   </>);

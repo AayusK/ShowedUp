@@ -49,6 +49,7 @@ export default function OrganizerView() {
   const clubId = session?.clubId ?? LEGACY_CLUB_ID;
 
   const [accessModal, setAccessModal] = useState(false);
+  const [accessCreating, setAccessCreating] = useState(false);
   const [accessError, setAccessError] = useState("");
   const [openCreateAfterAccess, setOpenCreateAfterAccess] = useState(false);
 
@@ -210,6 +211,9 @@ export default function OrganizerView() {
         case "organizer_unfunded":
           setCreateError(<>The organizer wallet needs devnet SOL. Fund <CopyText value={String(data.organizer)}/> at <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">faucet.solana.com</a>, then try again.</>);
           break;
+        case "club_not_verified":
+          setCreateError("Your club isn’t verified yet. Events unlock once ShowedUp verifies it.");
+          break;
         case "club_key_not_configured":
           setCreateError("This club’s wallet isn’t set up. Check CLUB_KEY_SECRET in the server’s settings.");
           break;
@@ -275,7 +279,7 @@ export default function OrganizerView() {
     ? termEvents.reduce((n, e) => n + (e.attendees ?? 0), 0) : termEvents.length === 0 ? 0 : null;
   const termBadges = roleBadges.filter(inTerm).reduce((n, e) => n + (e.attendees ?? 0), 0);
 
-  function openAccess() { setOpenCreateAfterAccess(false); setAccessError(""); setAccessModal(true); }
+  function openAccess(creating = false) { setOpenCreateAfterAccess(false); setAccessError(""); setAccessCreating(creating); setAccessModal(true); }
 
   const eventRow = (e: EventItem, next = false) => {
     const contribution = e.kind === "contribution";
@@ -326,15 +330,21 @@ export default function OrganizerView() {
         </div>
         <span className="dash-spacer"/>
         {session && (tab === "overview" || tab === "events" || tab === "badges") && <>
-          <button className="button secondary" onClick={() => setAward(null)}><Icon name="spark" size={16}/> Award a badge</button>
-          <button className="button primary" onClick={openCreate}><Icon name="plus" size={16}/> New event</button>
+          <button className="button secondary" disabled={club?.verified === false} onClick={() => setAward(null)}><Icon name="spark" size={16}/> Award a badge</button>
+          <button className="button primary" disabled={club?.verified === false} onClick={openCreate}><Icon name="plus" size={16}/> New event</button>
         </>}
       </div>
 
       {!session && sessionChecked && <div className="dash-signin">
         <Icon name="shield" size={22}/>
         <div><strong>Sign in to your club</strong><span>Use your club’s passcode to create events, run check-in and see who showed up.</span></div>
-        <button className="button primary" onClick={openAccess}>Enter passcode <Icon name="arrow" size={15}/></button>
+        <button className="button primary" onClick={() => openAccess()}>Enter passcode <Icon name="arrow" size={15}/></button>
+        <button className="button secondary" onClick={() => openAccess(true)}><Icon name="plus" size={15}/> Create a club</button>
+      </div>}
+
+      {session && club && !club.verified && <div className="dash-pending-club" role="status">
+        <Icon name="shield" size={18}/>
+        <div><strong>Waiting for verification</strong><span>Your club is set up. Creating events and badges unlocks once ShowedUp verifies {club.name}; badges from unverified clubs wouldn’t count on anyone’s track record yet.</span></div>
       </div>}
 
       {session && tab === "events" && <>
@@ -453,7 +463,7 @@ export default function OrganizerView() {
     </div>
   </main>
   {award !== false && session && <AwardModal session={session} existing={award ?? undefined} onClose={() => setAward(false)} onChanged={loadEvents} />}
-  {accessModal && <OrganizerAccessModal initialError={accessError} onClose={()=>setAccessModal(false)} onUnlocked={onUnlocked} />}
+  {accessModal && <OrganizerAccessModal startCreating={accessCreating} initialError={accessError} onClose={()=>setAccessModal(false)} onUnlocked={onUnlocked} />}
   {createModal && <div className="modal-overlay" onClick={()=>!createBusy && setCreateModal(false)}><form role="dialog" aria-modal="true" aria-label="Create event" className="modal" onClick={e=>e.stopPropagation()} onSubmit={submitCreate}><button type="button" className="modal-close" aria-label="Close" disabled={createBusy} onClick={()=>setCreateModal(false)}>×</button><span className="eyebrow">MAKE ROOM FOR SOMETHING GOOD</span><h2>A reason to show up.</h2><p>Create an event for your community.</p><label className="field">Event name<input value={name} maxLength={80} placeholder="e.g. Builders Meeting" onChange={e=>setName(e.target.value)}/></label><div className="form-columns"><label className="field">Date<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label><label className="field">Time<input type="time" value={time} onChange={e=>setTime(e.target.value)}/></label></div><label className="field">Location<input value={location} maxLength={80} placeholder="e.g. UBC Nest, Room 2504 (optional)" onChange={e=>setLocation(e.target.value)}/></label><button type="submit" className="button primary full" disabled={createBusy}>{createBusy ? "Creating event token…" : "Create event"} <Icon name="arrow" size={16}/></button>{createError && <p className="form-error" role="alert">{createError}</p>}<small>Creates a nontransferable Token-2022 token on Solana devnet. The organizer wallet pays the fee. Takes a few seconds.</small></form></div>}
   </>;
 }

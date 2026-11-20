@@ -49,6 +49,8 @@ export async function POST(request: Request) {
     return error("server_not_configured", 500);
   }
   if (!club) return error("unauthorized", 401);
+  // An unverified club can't spend the organizer wallet's SOL until the registry admin verifies it.
+  if (!club.legacy && !club.verified) return error("club_not_verified", 403);
 
   let body: unknown;
   try {

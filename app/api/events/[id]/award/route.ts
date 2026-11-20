@@ -28,6 +28,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return error("server_not_configured", 500);
   }
   if (!event) return error("not_found", 404);
+  // An unverified club can't spend the organizer wallet's SOL until the registry admin verifies it.
+  if (!club.legacy && !club.verified) return error("club_not_verified", 403);
   // Another club's badge answers the same as a wrong passcode.
   if (!ownsEvent(club, event)) return error("unauthorized", 401);
   // Attendance is only ever claimed in the room with the QR code.

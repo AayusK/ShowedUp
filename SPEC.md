@@ -55,5 +55,6 @@ API: `GET/POST /api/clubs`, `GET/POST /api/events`, `POST /api/events/[id]/award
 - **Legacy club:** events from before clubs existed belong to one default club whose issuer is the organizer wallet; `ORGANIZER_PASSWORD` is its passcode and the registry admin password.
 - **Auth:** every club action sends `x-club-id` + `x-organizer-password`; passcodes are stored as scrypt hashes with a per-club salt.
 - **Privacy:** names stay in the database and are shown only to officers: of a club the student checked in to, or one they applied to (applying is the consent).
+- **Public profile (opt-in, Nov 20):** a student may add a name, headline, school, bio, LinkedIn/links and skills to their track record (`profiles` table, `db/06_profiles.sql`). It stays hidden until they switch it on, saving needs a wallet signature, and it never goes on-chain.
 - **Tiers** (1 = Showed Up, 3 = Regular, 5 = Core Member) still count attendance only.
 - **Out of scope:** payments, voting, a custom Solana program, the Solana Attestation Service, mainnet.

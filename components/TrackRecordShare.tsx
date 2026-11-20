@@ -46,21 +46,31 @@ export function TrackRecordShare({ wallet, isMine }: { wallet: string; isMine: b
     timer.current = setTimeout(() => setState("idle"), 2500);
   }
 
+  // The phone's own share sheet (Messages, LinkedIn, …) where the browser has one.
+  const [canShare, setCanShare] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  useEffect(() => { setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function"); }, []);
+  async function share() {
+    if (!url) return;
+    try { await navigator.share({ title: "My ShowedUp track record", text: "My verified track record from student clubs, on Solana.", url }); }
+    catch { /* closed the share sheet: nothing to do */ }
+  }
+
   return (
-    <section className="panel tr-share">
-      <div className="tr-share-copy">
-        <span className="eyebrow">SHARE IT</span>
-        <h2>{isMine ? "Take your track record with you." : "Pass this track record along."}</h2>
-        <p>{isMine ? "Send this link to another club, or let them scan the code." : "Anyone with this link sees the same record."} It shows verified badges and a wallet address, never a name.</p>
-        <input className="tr-share-link" readOnly value={url} placeholder="Getting the link…" aria-label="Link to this track record" onFocus={(e) => e.currentTarget.select()}/>
+    <section className="panel tr-share tr-share-v2">
+      <div className="tr-share-row">
+        <div className="tr-share-copy">
+          <h2>{isMine ? "Share your track record" : "Share this track record"}</h2>
+          <p>Anyone with the link sees the same verified badges.{isMine ? " Your profile shows only if you switched it on." : ""}</p>
+        </div>
         <div className="tr-share-actions">
-          <button type="button" className="button primary" onClick={copy} disabled={!url}>{state === "copied" ? "Copied" : "Copy link"} <Icon name={state === "copied" ? "check" : "arrow"} size={16}/></button>
-          <span className="tr-share-status" role="status">{state === "failed" ? "Couldn’t copy automatically. Select the link above and copy it." : ""}</span>
+          {canShare && <button type="button" className="button primary" onClick={share} disabled={!url}>Share <Icon name="arrow" size={15}/></button>}
+          <button type="button" className={`button ${canShare ? "secondary" : "primary"}`} onClick={copy} disabled={!url}>{state === "copied" ? "Copied" : "Copy link"} <Icon name={state === "copied" ? "check" : "external"} size={15}/></button>
+          <button type="button" className="button secondary" aria-expanded={showQr} onClick={() => setShowQr(!showQr)}>{showQr ? "Hide QR" : "Show QR"}</button>
         </div>
       </div>
-      <div className="qr-wrap tr-qr">{url
-        ? <QRCodeSVG value={url} size={160} fgColor="#0d1f78" level="M" marginSize={1} title="QR code linking to this track record"/>
-        : <div style={{aspectRatio: "1"}}/>}</div>
+      <span className="tr-share-status" role="status">{state === "failed" ? `Couldn’t copy automatically. The link is ${url}` : ""}</span>
+      {showQr && url && <div className="qr-wrap tr-qr"><QRCodeSVG value={url} size={180} fgColor="#0d1f78" level="M" marginSize={1} title="QR code linking to this track record"/></div>}
     </section>
   );
 }

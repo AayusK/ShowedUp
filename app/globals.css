@@ -860,3 +860,80 @@ body{font-family:var(--font-geist-sans),ui-sans-serif,system-ui,-apple-system,"S
 .present-refresh{color:var(--sub)}
 .present-exit kbd{background:#f1f2f5;color:var(--sub)}
 .present-qr-box{border-color:var(--hair)}
+
+/* Profile card on the track record (2026-11-20), Handshake-style: cover band, avatar, name,
+   headline, school line, LinkedIn, links, skills, About. */
+.pc-wrap{max-width:760px;margin:28px auto 0}
+.pc-wrap+.rec{margin-top:18px}
+.pc{background:#fff;border:1px solid var(--hair);border-radius:24px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.04)}
+.pc-cover{height:96px;background:radial-gradient(80% 140% at 85% 0%,#ff9ec4 0%,transparent 55%),radial-gradient(90% 160% at 20% 100%,#8fb0ff 0%,transparent 60%),linear-gradient(120deg,#5d87ff,#2148e0)}
+.pc-body{position:relative;padding:0 24px 20px;display:flex;flex-direction:column;gap:4px}
+.pc-avatar{width:88px;height:88px;margin-top:-44px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:600;color:#fff;background:linear-gradient(140deg,#5d87ff,#1733b0);border:4px solid #fff;box-shadow:0 6px 16px rgba(16,24,40,.15)}
+.pc-actions{position:absolute;top:14px;right:24px;display:flex;gap:8px;align-items:center}
+.pc-actions .button{padding:9px 16px;font-size:13px}
+.pc-linkedin{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:#0a66c2;color:#fff;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(10,102,194,.3)}
+.pc-linkedin span{display:grid;place-items:center;width:18px;height:18px;border-radius:4px;background:#fff;color:#0a66c2;font-size:12px;font-weight:800;line-height:1}
+.pc-linkedin:hover{background:#0858a8}
+.pc-name{font-size:28px;font-weight:600;letter-spacing:-.03em;margin-top:8px;color:var(--ink)}
+.pc-headline{font-size:15px;color:var(--ink-2)}
+.pc-edu{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--sub)}
+.pc-links{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px;margin-top:2px}
+.pc-links a{color:var(--blue);font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.pc-skills{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.pc-skills li{font-size:12.5px;font-weight:500;color:var(--ink-2);background:#f1f3f7;border:1px solid var(--hair);border-radius:999px;padding:4px 11px}
+.pc-hidden-note{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:#8a5200;background:#fbf0de;border-radius:10px;padding:8px 12px}
+.pc-about{border-top:1px solid var(--hair);padding:16px 24px 20px}
+.pc-about h2{font-size:15px;font-weight:600;margin-bottom:6px}
+.pc-about p{font-size:14.5px;line-height:1.65;color:var(--ink-2);white-space:pre-line}
+.pc-empty .pc-body{flex-direction:row;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-bottom:18px}
+.pc-empty .pc-avatar{background:#e9ecf2;color:#9aa0ab}
+.pc-empty-copy{flex:1;min-width:200px;display:flex;flex-direction:column;padding-bottom:4px}
+.pc-empty-copy strong{font-size:16px}
+.pc-empty-copy span{font-size:13.5px;color:var(--sub)}
+.pc-empty .button{padding:10px 16px;font-size:13px;gap:6px}
+.pc-editor{max-width:560px;max-height:calc(100vh - 48px);overflow-y:auto;text-align:left}
+.pc-editor h2,.pc-editor>p{text-align:left}
+.pc-grid{display:flex;flex-direction:column}
+.pc-grid .field{margin:10px 0}
+.pc-grid .form-columns{gap:12px}
+.pc-grid .field select{padding:12px;border:1px solid #dfe2e8;border-radius:11px;font-size:15px;background:#fff}
+.pc-grid textarea{font-size:15px;padding:12px;border:1px solid #dfe2e8;border-radius:11px;resize:vertical;width:100%;font-family:inherit}
+.pc-load{margin:10px 0 0;font-size:13.5px;color:var(--blue);font-weight:600}
+.pc-public{margin:12px 0 16px;font-size:14px;align-items:flex-start}
+@media (max-width:640px){.pc-actions{position:static;margin-top:8px}.pc-name{font-size:24px}.pc-cover{height:76px}.pc-avatar{width:76px;height:76px;margin-top:-38px;font-size:26px}}
+
+/* Track record summary inside the profile header, and the slimmer share box (2026-11-20). */
+.pc-avatar.is-blank{background:#eef2ff;color:var(--blue)}
+.pc-prompt{font-size:14px;color:var(--sub);margin-top:4px}
+.rs{margin-top:14px;padding-top:14px;border-top:1px solid var(--hair);display:flex;flex-direction:column;gap:10px}
+.rs-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rs-tier{font-size:14px;font-weight:600;color:#fff;background:var(--pill);border-radius:999px;padding:5px 12px}
+.rs-verified{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:var(--blue)}
+.rs-wallet{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-size:13px}
+.rs-wallet a{display:inline-flex;align-items:center;gap:4px;color:var(--sub);font-family:var(--font-geist-mono),ui-monospace,monospace}
+.rs-wallet .rec-copy{background:#f1f3f7;color:var(--ink-2);border:1px solid var(--hair)}
+.rs .profile-record-tier{padding:0;gap:8px}
+.rs .tier-progress-head{font-size:13px;color:var(--sub)}
+.rs .tier-progress{height:6px;background:#e9ecf2}
+.rs .tier-progress-fill{background:linear-gradient(90deg,#5d87ff,#2450f0)}
+.rs .tier-progress-stop{width:12px;height:12px;margin:-6px 0 0 -6px;border-color:#d5dbe6}
+.rs .tier-progress-stop.reached{background:var(--blue);border-color:var(--blue)}
+.rs .tier-progress-labels{font-size:12px;color:var(--sub)}
+.rs .tier-progress-labels span.reached{color:var(--ink)}
+.rs-stats{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;color:var(--sub)}
+.rs-stats strong{font-size:18px;font-weight:600;color:var(--ink);margin-right:2px}
+.tr-share-v2{padding:18px 22px}
+.tr-share-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.tr-share-v2 .tr-share-copy{flex:1;min-width:220px}
+.tr-share-v2 h2{font-size:17px;font-weight:600;margin-bottom:2px}
+.tr-share-v2 p{font-size:13.5px;color:var(--sub);margin:0}
+.tr-share-v2 .tr-share-actions{display:flex;gap:8px;flex-wrap:wrap}
+.tr-share-v2 .button{padding:10px 16px;font-size:13.5px;gap:6px}
+.tr-share-v2 .tr-qr{width:220px;margin:14px auto 0}
+.tr-share-v2 .tr-share-status{display:block;font-size:13px;color:var(--sub)}
+.dash-pending-club{display:flex;gap:12px;align-items:flex-start;background:#fbf0de;color:#6b4a00;border-radius:18px;padding:14px 16px}
+.dash-pending-club svg{color:#a8701c;flex-shrink:0;margin-top:2px}
+.dash-pending-club div{display:flex;flex-direction:column;gap:2px}
+.dash-pending-club strong{font-size:15px}
+.dash-pending-club span{font-size:13.5px;line-height:1.5}
+.button:disabled{opacity:.45;cursor:not-allowed;transform:none}

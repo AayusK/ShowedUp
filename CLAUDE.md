@@ -281,6 +281,14 @@ Possible next work (ask before starting any of it):
   to the same wallet (the claims row stays as the lock).
 - **Copy:** say "track record", never "background check". Records are positive only; no student
   name on-chain (club names are fine).
+- **Club sign-up (Nov 20, owner's OK):** anyone can create a club from the sign-in box
+  (`POST /api/clubs` without the admin password). It always starts unverified and can't create
+  events, award badges or add attendance (`club_not_verified`) until the registry admin verifies
+  it, so strangers can't spend the organizer wallet's SOL. Sign-ups pause at 50 pending clubs.
+- **Public profiles (Nov 20, owner's OK):** opt-in. A student's name, headline, school, bio, links
+  (LinkedIn shown as a button) and skills show on their track record only after they switch it
+  on. Stored in `profiles` (`db/06_profiles.sql`, RLS on, no policies); saving and reading a hidden
+  draft need a fresh wallet signature (`/api/profile-card/[wallet]`). Never on-chain.
 
 ## 8. Gotchas
 
