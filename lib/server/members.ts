@@ -1,5 +1,5 @@
 import "server-only";
-import { db } from "./db";
+import { db, readPages } from "./db";
 import type { EventRecord } from "./events";
 
 // Postgres / PostgREST codes for "that column doesn't exist": the new SQL hasn't been run yet.
@@ -31,9 +31,10 @@ export async function clubMembers(allEvents: Pick<EventRecord, "id" | "mint" | "
   // never shows a club their saved name.
   const events = allEvents.filter((e) => e.kind !== "contribution");
   if (events.length === 0) return [];
+  const mints = events.flatMap(e => e.mint ? [e.mint] : []);
   const [recorded, streamed] = await Promise.all([
     db().from("claims").select("wallet").in("event_id", events.map((e) => e.id)).eq("status", "confirmed"),
-    db().from("chain_claims").select("wallet").in("mint", events.map((e) => e.mint)),
+    mints.length ? db().from("chain_claims").select("wallet").in("mint", mints) : { data: [], error: null },
   ]);
   if (recorded.error) throw new Error(`member read failed: ${recorded.error.message}`);
   const wallets = [...new Set([
@@ -75,10 +76,12 @@ export interface Attendee {
 export async function eventAttendees(event: Pick<EventRecord, "id" | "mint">): Promise<Attendee[]> {
   const eventId = event.id;
 
-  const readClaims = (columns: string) =>
-    db().from("claims").select(columns).eq("event_id", eventId).eq("status", "confirmed");
+  const readClaims = (columns: string) => readPages((first, last) =>
+    db().from("claims").select(columns).eq("event_id", eventId).eq("status", "confirmed")
+      .order("wallet").range(first, last));
   const [streamed, firstRead] = await Promise.all([
-    db().from("chain_claims").select("wallet, block_time, received_at").eq("mint", event.mint),
+    event.mint ? readPages((first, last) => db().from("chain_claims").select("wallet, block_time, received_at")
+      .eq("mint", event.mint!).order("signature").range(first, last)) : { data: [], error: null },
     readClaims("wallet, updated_at, revoked_at"),
   ]);
   // Before db/04_revocation.sql is run there is no `revoked_at` column: nobody has been revoked.
@@ -105,9 +108,13 @@ export async function eventAttendees(event: Pick<EventRecord, "id" | "mint">): P
   if (byWallet.size === 0) return [];
 
   const wallets = [...byWallet.keys()];
-  const { data: members, error: memberErr } = await db().from("members").select("wallet, name").in("wallet", wallets);
-  if (memberErr) throw new Error(`member read failed: ${memberErr.message}`);
-  const names = new Map((members ?? []).map((m) => [m.wallet as string, m.name as string]));
+  const names = new Map<string, string>();
+  // Keep the encoded wallet list in each PostgREST URL below typical proxy limits.
+  for (let i = 0; i < wallets.length; i += 80) {
+    const { data, error } = await db().from("members").select("wallet, name").in("wallet", wallets.slice(i, i + 80));
+    if (error) throw new Error(`member read failed: ${error.message}`);
+    for (const m of data ?? []) names.set(m.wallet, m.name);
+  }
 
   const time = (at: string | null) => (at ? Date.parse(at) || 0 : 0);
   return wallets

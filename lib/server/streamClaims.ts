@@ -3,6 +3,8 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { db } from "./db";
+import { parseReceiptFile, verifyReceipt } from "@/lib/receipt";
+import { getConnection } from "./mint";
 import { readEvents } from "./events";
 
 // Live claim feed. A QuickNode Stream watches every new Solana devnet block, keeps the
@@ -58,7 +60,10 @@ const wholeNumber = (v: unknown): number | null =>
  * may wrap that (e.g. under `data`), so we walk the payload a few levels deep and keep
  * anything shaped like a claim. Every field is checked: this is data from outside.
  */
-export function extractClaims(payload: unknown): StreamClaim[] {
+export interface StreamReceipt { signature: string; hash: string; blockTime: number | null }
+
+export function extractDelivery(payload: unknown) {
+  const receipts = new Map<string, StreamReceipt>();
   const found = new Map<string, StreamClaim>();
   const visit = (node: unknown, depth: number) => {
     if (depth > 6 || node === null || typeof node !== "object") return;
@@ -67,6 +72,10 @@ export function extractClaims(payload: unknown): StreamClaim[] {
       return;
     }
     const o = node as Record<string, unknown>;
+    if (isSignature(o.signature) && typeof o.hash === "string" && /^[a-f0-9]{64}$/.test(o.hash)) {
+      receipts.set(o.signature, { signature: o.signature, hash: o.hash, blockTime: wholeNumber(o.blockTime) });
+      return;
+    }
     if (isSignature(o.signature) && isAddress(o.mint) && isAddress(o.owner)) {
       found.set(`${o.signature}:${o.mint}:${o.owner}`, {
         signature: o.signature,
@@ -80,7 +89,7 @@ export function extractClaims(payload: unknown): StreamClaim[] {
     for (const value of Object.values(o)) visit(value, depth + 1);
   };
   visit(payload, 0);
-  return [...found.values()];
+  return { claims: [...found.values()], receipts: [...receipts.values()] };
 }
 
 /**
@@ -105,4 +114,36 @@ export async function storeChainClaims(claims: StreamClaim[]): Promise<{ stored:
     if (error) throw new Error(`chain_claims write failed: ${error.message}`);
   }
   return { stored: rows.length, ignored: claims.length - rows.length };
+}
+
+/** Only acknowledge known transactions, even if an unrelated memo uses our text prefix.
+ * A signed delivery can also finish an issue whose officer disconnected during confirmation. */
+export async function storeReceiptObservations(receipts: StreamReceipt[]) {
+  let stored = 0;
+  for (const { signature, hash, blockTime } of receipts) {
+    const table = db().from("contribution_receipts");
+    const read = await table.select("receipt_file, confirmed_at, streamed_at").eq("signature", signature).maybeSingle();
+    if (read.error) throw new Error("Could not read receipt observation");
+    if (!read.data) continue;
+    const file = parseReceiptFile(read.data.receipt_file);
+    if (file.receipt.hash !== hash) continue;
+    if (!read.data.streamed_at) {
+      const time = blockTime ? new Date(blockTime * 1000).toISOString() : new Date().toISOString();
+      if (!read.data.confirmed_at) {
+        const proof = await verifyReceipt(file, getConnection(), file.receipt.issuer);
+        if (!proof.ok) {
+          if (proof.reason === "rpc_error" || proof.reason === "not_found") throw new Error("Receipt confirmation unavailable");
+          continue;
+        }
+        const reconciled = await table.update({ confirmed_at: time, signed_transaction: null })
+          .eq("signature", signature).is("confirmed_at", null);
+        if (reconciled.error) throw new Error("Could not reconcile receipt confirmation");
+      }
+      const write = await table.update({ streamed_at: time }).eq("signature", signature)
+        .not("confirmed_at", "is", null).is("streamed_at", null);
+      if (write.error) throw new Error("Could not save receipt observation");
+    }
+    stored++;
+  }
+  return { stored, ignored: receipts.length - stored };
 }

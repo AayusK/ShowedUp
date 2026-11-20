@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ShowedUp",
-  description: "Soulbound proof-of-attendance for student clubs on Solana",
+  description: "Private club check-ins and verifiable contribution receipts",
 };
 
 export default function RootLayout({

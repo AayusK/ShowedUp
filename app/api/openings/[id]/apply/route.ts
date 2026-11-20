@@ -75,7 +75,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     //    "you qualify" is never trusted.
     let check;
     try {
-      check = await checkRule(opening, owner);
+      check = await checkRule(opening, owner, true);
     } catch (e) {
       console.error("[api/openings/apply] track record read failed:", e instanceof Error ? e.message.split("\n")[0] : "unknown");
       return error("rpc_error", 502);

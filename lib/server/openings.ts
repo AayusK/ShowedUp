@@ -3,6 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { db } from "./db";
 import { newId } from "./ids";
 import { getClub, readClubs, type ClubRecord } from "./clubs";
+import { getPrivateProfile } from "./privateProfile";
 import { getProfile, type Profile } from "./profile";
 import { isRole, type Role } from "@/lib/badges";
 import {
@@ -184,7 +185,7 @@ export async function listClubOpenings(club: ClubRecord): Promise<ClubOpening[]>
 // ---- The rule -----------------------------------------------------------------------------
 
 function toCounted(e: Profile["events"][number]): CountedBadge {
-  return { name: e.name, club: e.club.name, role: e.role, date: e.date, mint: e.mint };
+  return { name: e.name, club: e.club.name, role: e.role, date: e.date, mint: e.mint, ...(e.receiptFile ? { receiptFile: e.receiptFile } : {}) };
 }
 
 /**
@@ -207,8 +208,8 @@ function evaluate(opening: Pick<OpeningInfo, "role" | "minCount">, profile: Prof
  * (getProfile) every time it is asked, so the answer can't be faked by the browser and reflects
  * the record as it is right now. Throws if Solana can't be reached.
  */
-export async function checkRule(opening: Pick<OpeningInfo, "role" | "minCount">, owner: PublicKey): Promise<RuleCheck> {
-  const profile = await getProfile(owner);
+export async function checkRule(opening: Pick<OpeningInfo, "role" | "minCount">, owner: PublicKey, includeReceipts = false): Promise<RuleCheck> {
+  const profile = includeReceipts ? await getPrivateProfile(owner, { kind: "opening", role: opening.role }) : await getProfile(owner);
   const { matched, counted, qualifies, remaining } = evaluate(opening, profile);
   return {
     qualifies,
@@ -251,9 +252,11 @@ export async function decideApplication(openingId: string, wallet: string, decis
 }
 
 /** Reads one applicant's badges from Solana and sums up what counted. null if that read failed. */
-async function summarise(opening: Pick<OpeningInfo, "role" | "minCount">, wallet: string): Promise<ApplicantSummary | null> {
+async function summarise(opening: Pick<OpeningInfo, "role" | "minCount">, wallet: string, appliedAt: string): Promise<ApplicantSummary | null> {
   try {
-    const { matched, counted, qualifies } = evaluate(opening, await getProfile(new PublicKey(wallet)));
+    const profile = await getPrivateProfile(new PublicKey(wallet), { kind: "opening", role: opening.role, appliedAt });
+    if (profile.partial) return null;
+    const { matched, counted, qualifies } = evaluate(opening, profile);
     const perClub = new Map<string, number>();
     for (const e of matched) perClub.set(e.club.name, (perClub.get(e.club.name) ?? 0) + 1);
     return {
@@ -295,7 +298,7 @@ export async function listApplicants(
   const summaries: (ApplicantSummary | null)[] = [];
   for (let i = 0; i < rows.length; i += SUMMARIES_AT_ONCE) {
     const batch = rows.slice(i, i + SUMMARIES_AT_ONCE);
-    summaries.push(...(await Promise.all(batch.map((r) => summarise(opening, r.wallet)))));
+    summaries.push(...(await Promise.all(batch.map((r) => summarise(opening, r.wallet, r.created_at)))));
   }
 
   return {

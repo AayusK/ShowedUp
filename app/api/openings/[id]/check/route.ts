@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
+import { authorizePrivateRead } from "@/lib/server/privateAccess";
 import { checkRule, getOpening } from "@/lib/server/openings";
 import { OPENING_ID_RE } from "@/lib/openings";
 
@@ -27,6 +28,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return error("invalid_wallet", 400);
   }
 
+  return resultFor(id, owner, false);
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!OPENING_ID_RE.test(id)) return error("not_found", 404);
+  const owner = await authorizePrivateRead(request, `opening/${id}`);
+  if (!owner) return error("bad_signature", 401);
+  return resultFor(id, owner, true);
+}
+
+async function resultFor(id: string, owner: PublicKey, includeReceipts: boolean) {
   let opening;
   try {
     opening = await getOpening(id);
@@ -37,8 +50,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!opening) return error("not_found", 404);
 
   try {
-    const check = await checkRule(opening, owner);
-    return NextResponse.json({ ...check, closed: opening.closed }, { headers: { "cache-control": "no-store" } });
+    const check = await checkRule(opening, owner, includeReceipts);
+    return NextResponse.json({ ...check, closed: opening.closed }, { headers: { "cache-control": "private, no-store" } });
   } catch (e) {
     console.error("[api/openings/check] track record read failed:", e instanceof Error ? e.message.split("\n")[0] : "unknown");
     return error("rpc_error", 502);

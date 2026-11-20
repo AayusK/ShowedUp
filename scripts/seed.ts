@@ -1,13 +1,4 @@
-// Demo prep: give a wallet attendance at past events so the live demo can show it
-// going from 4 to 5 and unlocking Core Member.
-//
-// Usage:  npm run seed -- <wallet address> [--target 4]
-//
-// For each of 4 past events (created on first run, reused afterwards) it mints 1
-// attendance token to the wallet, stopping once the wallet holds `target` events
-// in total (default 4). Safe to run again: it never mints twice to the same wallet
-// and never creates duplicate past events.
-// Cost (organizer pays): about 0.003 SOL per new event + 0.002 SOL per new token account.
+// Give a demo wallet up to four attendance events. New events use private check-ins.
 import { config } from "dotenv";
 
 config({ path: ".env.local" });
@@ -32,11 +23,10 @@ async function main() {
   // Imported after dotenv so the server libs see RPC_URL and the Supabase settings.
   const { PublicKey } = await import("@solana/web3.js");
   const { newId } = await import("../lib/server/ids");
-  const { LEGACY_CLUB_NAME } = await import("../lib/clubs");
   const { readEvents, addEvent } = await import("../lib/server/events");
-  const { createEventMint } = await import("../lib/server/mint");
+  const { checkIn } = await import("../lib/server/claimsDb");
   const { hasClaimed, mintAttendance } = await import("../lib/server/claim");
-  const { getProfile } = await import("../lib/server/profile");
+  const { getPrivateProfile } = await import("../lib/server/privateProfile");
   const { explorerLink } = await import("../lib/solana");
 
   let owner: InstanceType<typeof PublicKey>;
@@ -48,7 +38,7 @@ async function main() {
     process.exit(1);
   }
 
-  let count = (await getProfile(owner)).count;
+  let count = (await getPrivateProfile(owner, { kind: "owner" })).count;
   console.log(`Wallet ${owner.toBase58()} currently has ${count} event(s). Target: ${target}.`);
   if (count >= target) {
     console.log("Nothing to do.");
@@ -61,14 +51,16 @@ async function main() {
     // Only the default club's events: the organizer wallet can't mint another club's badge.
     let event = (await readEvents()).find((e) => !e.clubId && e.name === past.name && e.date === past.date);
     if (!event) {
-      // The id comes first: the token's address on Solana is derived from it.
-      const id = newId();
-      const { mint } = await createEventMint({ id, ...past, kind: "attendance", role: "Attendee", club: LEGACY_CLUB_NAME });
-      event = { id, ...past, mint, createdAt: new Date().toISOString() };
+      event = { id: newId(), ...past, mint: null, createdAt: new Date().toISOString() };
       await addEvent(event);
-      console.log(`  created event   ${past.name}  (${explorerLink(mint)})`);
+      console.log(`  created event   ${past.name}`);
     }
-
+    if (!event.mint) {
+      const result = await checkIn(event.id, owner.toBase58());
+      if (result === "success") count++;
+      console.log(`  ${result}  ${event.name}`);
+      continue;
+    }
     const mint = new PublicKey(event.mint);
     if (await hasClaimed(mint, owner)) {
       console.log(`  already holds   ${past.name}`);
@@ -79,7 +71,7 @@ async function main() {
     console.log(`  minted          ${past.name}  (${explorerLink(sig, "tx")})`);
   }
 
-  console.log(`Done. Wallet now has ${(await getProfile(owner)).count} event(s).`);
+  console.log(`Done. Wallet now has ${(await getPrivateProfile(owner, { kind: "owner" })).count} event(s).`);
 }
 
 main().catch((e) => {

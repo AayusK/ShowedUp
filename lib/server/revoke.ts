@@ -37,18 +37,19 @@ export type RevokeResult =
 const revocableCache = new Map<string, boolean>();
 
 export async function isRevocable(event: Pick<EventRecord, "mint">, club: Pick<ClubRecord, "issuer">): Promise<boolean> {
+  if (!event.mint) return false;
   const key = `${event.mint}:${club.issuer}`;
   const known = revocableCache.get(key);
   if (known !== undefined) return known;
-  const answer = await readRevocable(event, club);
+  const answer = await readRevocable(event.mint, club);
   revocableCache.set(key, answer);
   return answer;
 }
 
-async function readRevocable(event: Pick<EventRecord, "mint">, club: Pick<ClubRecord, "issuer">): Promise<boolean> {
+async function readRevocable(address: string, club: Pick<ClubRecord, "issuer">): Promise<boolean> {
   const connection = getConnection();
   const mint = await withRetry(() =>
-    getMint(connection, new PublicKey(event.mint), "confirmed", TOKEN_2022_PROGRAM_ID),
+    getMint(connection, new PublicKey(address), "confirmed", TOKEN_2022_PROGRAM_ID),
   );
   const delegate = getPermanentDelegate(mint);
   return !!delegate && delegate.delegate.toBase58() === club.issuer;
@@ -73,7 +74,7 @@ async function heldAmount(ata: PublicKey): Promise<bigint> {
  * tokens with a balance above 0, so the badge drops off their track record once this confirms.
  */
 export async function revokeBadge(event: EventRecord, club: ClubRecord, owner: PublicKey): Promise<RevokeResult> {
-  if (!(await isRevocable(event, club))) return { status: "not_revocable" };
+  if (!event.mint || !(await isRevocable(event, club))) return { status: "not_revocable" };
 
   const mint = new PublicKey(event.mint);
   const wallet = owner.toBase58();

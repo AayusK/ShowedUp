@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { Badge } from "@/components/Badge";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { AwardModal } from "../AwardModal";
 import { OrganizerAccessModal } from "@/components/OrganizerAccessModal";
 import { formatDay, formatTime } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
@@ -39,6 +40,7 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
   const inFlight = useRef(false);
   const [attendees, setAttendees] = useState<number | null>(null);
   // Present mode: the same check-in, laid out full screen for a projector.
+  const [awarding, setAwarding] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [countBump, setCountBump] = useState(false);
   const prevAttendees = useRef<number | null>(null);
@@ -96,7 +98,7 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
 
   // Live check-in count, read from the event token's on-chain supply.
   useEffect(() => {
-    if (!event) return;
+    if (!event?.mint) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -129,7 +131,7 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
         });
         if (!res.ok) return;
         const data = (await res.json()) as { attendees: Attendee[]; revocable?: boolean };
-        if (!cancelled) { setRoster(data.attendees); setRevocable(!!data.revocable); }
+        if (!cancelled) { setRoster(data.attendees); setRevocable(!!data.revocable); if (!event.mint) setAttendees(data.attendees.length); }
       } catch {}
     };
     load();
@@ -219,7 +221,7 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
   return <><SiteHeader view="event" />
   <main className="shell">
     <Link className="back-link" href="/organizer">← All events</Link>
-    <div className="checkin-layout with-roster"><div><Badge>{club.name} · Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>Tap Claim. Your organizer covers the fees.</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}<button type="button" className="button secondary present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button></div>
+    <div className="checkin-layout with-roster"><div><Badge>{club.name} · Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>{event.mint ? "Tap Claim. Your organizer covers the fees." : "Confirm your check-in. There is no transaction fee."}</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}<button type="button" className="button secondary present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button></div>
       <div className={`qr-panel${urgency ? " " + urgency : ""}`}><div className="qr-title"><span className="brand mini"><span className="brand-mark">↗</span>ShowedUp</span><span className="quiet-pill">DEVNET</span></div><h2>You’re in the right place.</h2><p>Scan to claim your attendance.</p>
         <div className="qr-wrap">{claimUrl
           ? <QRCodeSVG value={qrValue} size={224} fgColor="#173d2d" level="M" marginSize={1}/>
@@ -241,7 +243,8 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
         {revokeError && <p className="form-error revoke-error" role="alert">{revokeError}</p>}
         {streamedCount > 0 && roster && <small className="qr-disclaimer" style={{margin: "10px 0 12px", padding: "0 24px", textAlign: "center"}}>{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
       </aside></div>
-    <div className="token-details"><Icon name="shield" size={17}/><span>Event token<small>{event.name} · Token-2022 · Nontransferable · 0 decimals</small></span><a className="pill-link" href={explorerLink(event.mint)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div>
+    {event.mint ? <div className="token-details"><Icon name="shield" size={17}/><span>Event token<small>{event.name} · Token-2022 · Nontransferable · 0 decimals</small></span><a className="pill-link" href={explorerLink(event.mint)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div> : session && <button className="button secondary" onClick={() => setAwarding(true)}>Confirm a contribution</button>}
+    {awarding && session && <AwardModal session={session} events={[event]} onClose={() => setAwarding(false)} onChanged={() => setRosterTick(t => t + 1)} />}
   </main><SiteFooter />
   {presenting && <div className={`present${urgency ? " " + urgency : ""}`} role="dialog" aria-modal="true" aria-label={`Check-in for ${event.name}, full screen`}>
     <button type="button" className="present-exit" onClick={() => setPresenting(false)}>Exit <kbd>Esc</kbd></button>
