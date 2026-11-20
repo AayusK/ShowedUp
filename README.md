@@ -51,7 +51,7 @@ Variables**; locally they're in `.env.local` (never commit it). See `.env.exampl
 | `EVENT_SECRET` | Any long random string. Signs the rotating QR codes. |
 | `ORGANIZER_PASSWORD` | Password of the registry admin, who creates and verifies clubs. Also the default club's passcode (creating events, showing QR codes). |
 | `CLUB_KEY_SECRET` | Any long random string (32+ characters). Every other club's Solana wallet is worked out from it and the club's id, so no club key is stored anywhere. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. **Never change it once clubs exist:** every club would get a new wallet and the badges they already issued would stop counting. |
-| `RPC_URL` | Devnet RPC. Use a free [Helius](https://helius.dev) **devnet** URL; the public endpoint rate-limits. |
+| `RPC_URL` | Devnet RPC. Use a free [Helius](https://helius.dev) **devnet** URL; the public endpoint rate-limits. The server checks the cluster identity and falls back to the public devnet endpoint if needed. |
 | `SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_SECRET_KEY` | Supabase secret key (`sb_secret_…`, Project Settings → API Keys). |
 | `PRIVY_APP_ID` (optional) | [Privy](https://dashboard.privy.io) app ID. Lets attendees sign in with email or Google instead of Phantom; a Solana wallet is created for them. Not a secret. Leave empty for Phantom-only. |

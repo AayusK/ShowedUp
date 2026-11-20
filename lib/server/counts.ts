@@ -13,7 +13,7 @@ import { getConnection, withRetry } from "./mint";
 async function getMintSupplies(mints: string[]): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   const keys = mints.map((m) => new PublicKey(m));
-  const connection = getConnection();
+  const connection = await getConnection();
   for (let i = 0; i < keys.length; i += 100) {
     const batch = keys.slice(i, i + 100);
     const infos = await withRetry(() => connection.getMultipleAccountsInfo(batch, "confirmed"));

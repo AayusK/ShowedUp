@@ -55,7 +55,7 @@ export async function confirmContribution(
 
   const signature = row.receipt_file.receipt.signature;
   if (row.confirmed_at) return { status: "already_awarded", signature };
-  const connection = getConnection();
+  const connection = await getConnection();
   // Read finalized height first, then transaction history. A node that has crossed the expiry
   // height has already seen the blocks in which the old transaction could have landed.
   const height = await connection.getBlockHeight("finalized");

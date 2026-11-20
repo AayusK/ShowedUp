@@ -1,12 +1,14 @@
 import "server-only";
 import { randomBytes } from "crypto";
 import bs58 from "bs58";
-import { PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { PUBLIC_DEVNET_RPC } from "@/lib/solana";
 import {
   MEMO_PROGRAM_ID,
   RECEIPT_FORMAT,
   receiptMemo,
   recordHash,
+  verifyReceipt,
   type ReceiptFile,
   type RecordFields,
 } from "@/lib/receipt";
@@ -36,6 +38,16 @@ export interface PreparedReceipt {
   last_valid_block_height: number;
 }
 
+/** Some devnet RPCs serve current accounts but keep a shorter transaction history. */
+export async function verifyDevnetReceipt(file: ReceiptFile, issuer: string) {
+  const connection = await getConnection();
+  const result = await verifyReceipt(file, connection, issuer);
+  if (!result.ok && (result.reason === "rpc_error" || result.reason === "not_found") && connection.rpcEndpoint !== PUBLIC_DEVNET_RPC) {
+    return verifyReceipt(file, new Connection(PUBLIC_DEVNET_RPC, "confirmed"), issuer);
+  }
+  return result;
+}
+
 /** Sign first so an officer's request can persist the exact transaction before broadcasting. */
 export async function prepareReceipt(
   club: ClubRecord, record: RecordFields, salt = randomBytes(32).toString("hex"),
@@ -43,7 +55,7 @@ export async function prepareReceipt(
   const organizer = getOrganizerKeypair();
   const issuer = getClubKeypair(club);
   const hash = recordHash(record, salt);
-  const connection = getConnection();
+  const connection = await getConnection();
   const balance = await withRetry(() => connection.getBalance(organizer.publicKey));
   if (balance < FEE_BUFFER_LAMPORTS) {
     throw new OrganizerUnfundedError(organizer.publicKey.toBase58(), FEE_BUFFER_LAMPORTS);
@@ -65,7 +77,7 @@ export async function prepareReceipt(
 
 /** Re-sending these same bytes always has the same transaction signature. */
 export async function sendReceipt(prepared: PreparedReceipt): Promise<boolean> {
-  const connection = getConnection();
+  const connection = await getConnection();
   const signature = prepared.receipt_file.receipt.signature;
   const bytes = Buffer.from(prepared.signed_transaction, "base64");
   // The RPC can report a duplicate submission or time out after accepting the bytes. Only
@@ -92,7 +104,8 @@ export async function issueReceipt(club: ClubRecord, record: RecordFields): Prom
   const prepared = await prepareReceipt(club, record);
   if (!await sendReceipt(prepared)) {
     const blockhash = Transaction.from(Buffer.from(prepared.signed_transaction, "base64")).recentBlockhash!;
-    const result = await getConnection().confirmTransaction({ signature: prepared.receipt_file.receipt.signature,
+    const connection = await getConnection();
+    const result = await connection.confirmTransaction({ signature: prepared.receipt_file.receipt.signature,
       blockhash, lastValidBlockHeight: prepared.last_valid_block_height }, "confirmed");
     if (result.value.err) throw new Error("Receipt transaction failed on-chain");
   }

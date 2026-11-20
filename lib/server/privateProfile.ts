@@ -3,11 +3,11 @@ import type { PublicKey } from "@solana/web3.js";
 import { LEGACY_CLUB_ID } from "@/lib/clubs";
 import { isRole, type Role } from "@/lib/badges";
 import type { Profile, ProfileEvent } from "@/lib/profileClient";
-import { parseReceiptFile, recordHash, verifyReceipt, type RecordValue } from "@/lib/receipt";
+import { parseReceiptFile, recordHash, type RecordValue } from "@/lib/receipt";
 import { getNextTier, getTier } from "@/lib/tiers";
 import { clubInfo, readClubs } from "./clubs";
 import { db, readPages } from "./db";
-import { getConnection } from "./mint";
+import { verifyDevnetReceipt } from "./receipts";
 import { getProfile } from "./profile";
 
 type View = { kind: "owner" } | { kind: "opening"; role: Role | null; appliedAt?: string };
@@ -57,7 +57,7 @@ async function privateEvents(wallet: string, view: View) {
         || record.role === "Attendee" || record.role !== row.role || recordHash(record, file.salt) !== file.receipt.hash) return;
       if (view.kind === "opening") {
         if (!club.verified) return;
-        const proof = await verifyReceipt(file, getConnection(), club.issuer);
+        const proof = await verifyDevnetReceipt(file, club.issuer);
         if (!proof.ok) { if (proof.reason === "rpc_error" || proof.reason === "not_found") partial = true; return; }
       }
       events.push({ id: `${event.id}-${record.role}`, name: event.name, date: event.date,

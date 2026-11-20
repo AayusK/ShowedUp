@@ -46,7 +46,7 @@ function attendeeTokenAccount(mint: PublicKey, owner: PublicKey): PublicKey {
 
 /** True if this wallet already holds at least 1 of the event's token. */
 export async function hasClaimed(mint: PublicKey, owner: PublicKey): Promise<boolean> {
-  const connection = getConnection();
+  const connection = await getConnection();
   try {
     const account = await withRetry(() =>
       getAccount(connection, attendeeTokenAccount(mint, owner), "confirmed", TOKEN_2022_PROGRAM_ID),
@@ -70,7 +70,7 @@ export async function hasClaimed(mint: PublicKey, owner: PublicKey): Promise<boo
 export async function mintAttendance(mint: PublicKey, owner: PublicKey, issuer?: Keypair): Promise<string> {
   const organizer = getOrganizerKeypair();
   const club = issuer ?? organizer;
-  const connection = getConnection();
+  const connection = await getConnection();
   const ata = attendeeTokenAccount(mint, owner);
 
   // Worst case we create a new token account: NonTransferable mints give it the

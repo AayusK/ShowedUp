@@ -3,8 +3,8 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { db } from "./db";
-import { parseReceiptFile, verifyReceipt } from "@/lib/receipt";
-import { getConnection } from "./mint";
+import { parseReceiptFile } from "@/lib/receipt";
+import { verifyDevnetReceipt } from "./receipts";
 import { readEvents } from "./events";
 
 // Live claim feed. A QuickNode Stream watches every new Solana devnet block, keeps the
@@ -130,7 +130,7 @@ export async function storeReceiptObservations(receipts: StreamReceipt[]) {
     if (!read.data.streamed_at) {
       const time = blockTime ? new Date(blockTime * 1000).toISOString() : new Date().toISOString();
       if (!read.data.confirmed_at) {
-        const proof = await verifyReceipt(file, getConnection(), file.receipt.issuer);
+        const proof = await verifyDevnetReceipt(file, file.receipt.issuer);
         if (!proof.ok) {
           if (proof.reason === "rpc_error" || proof.reason === "not_found") throw new Error("Receipt confirmation unavailable");
           continue;
