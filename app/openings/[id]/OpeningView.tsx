@@ -75,7 +75,7 @@ export default function OpeningView({ opening }: { opening: OpeningInfo | null }
   }, [walletAddress]);
 
   if (!opening) {
-    return <><SiteHeader view="claim" /><main className="shell"><div className="center-page"><Link href="/" className="back-link">← Back to overview</Link><div className="claim-panel"><div className="large-symbol neutral-symbol"><Icon name="people" size={32}/></div><h1>We couldn’t find that opening.</h1><p>Check the link, or head back to the overview to see what’s open right now.</p></div></div></main><SiteFooter /></>;
+    return <><SiteHeader view="claim" /><main className="shell claim-v2"><div className="center-page"><Link href="/" className="back-link">← Back to overview</Link><div className="claim-panel"><div className="large-symbol neutral-symbol"><Icon name="people" size={32}/></div><h1>We couldn’t find that opening.</h1><p>Check the link, or head back to the overview to see what’s open right now.</p></div></div></main><SiteFooter /></>;
   }
   const o = opening;
 
@@ -176,7 +176,7 @@ export default function OpeningView({ opening }: { opening: OpeningInfo | null }
   const done = outcome?.kind === "applied" || (outcome?.kind === "already" && outcome.status !== "declined");
 
   return <><SiteHeader view="claim" />
-  <main className="shell"><div className="center-page"><Link href="/" className="back-link">← Back to overview</Link><div className="claim-panel opening-panel"><div className={`large-symbol${closed && !outcome ? " neutral-symbol" : ""}${outcome?.kind === "applied" ? " pop" : ""}`}><Icon name={done ? "check" : "people"} size={32}/></div><Badge>{o.clubName}</Badge><h1>{o.title}</h1>{o.description && <p className="opening-description">{o.description}</p>}
+  <main className="shell claim-v2"><div className="center-page"><Link href="/" className="back-link">← Back to overview</Link><div className="claim-panel opening-panel"><div className={`large-symbol${closed && !outcome ? " neutral-symbol" : ""}${outcome?.kind === "applied" ? " pop" : ""}`}><Icon name={done ? "check" : "people"} size={32}/></div><Badge>{o.clubName}</Badge><h1>{o.title}</h1>{o.description && <p className="opening-description">{o.description}</p>}
     <div className="opening-rule"><span className="eyebrow">WHO CAN APPLY</span><strong>{rule}</strong><small>Badges from every verified club count together. They’re read from Solana, not from a form.{closed ? " This opening has closed." : closesLabel ? ` Open until ${closesLabel}.` : ""}</small></div>
 
     {!outcome && <>

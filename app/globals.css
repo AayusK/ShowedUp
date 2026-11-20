@@ -646,3 +646,33 @@ body:has(.profile-record) { background: #f7f8fa; }
   .home2-copy h1{font-size:38px}
   .home2-card{transform:none}
 }
+
+/* Remaining pieces in the new style (2026-11-20): back links, result boxes, pop-ups, and the
+   share / unverified sections under the track record. */
+.claim-v2 .back-link{margin:0 0 14px;font-size:13px;font-weight:600;color:var(--green)}
+.claim-v2 .center-page>.back-link{margin-bottom:14px}
+.claim-v2 .verification-result,.claim-v2 .opening-result{border-radius:14px;font-size:14px}
+.claim-v2 .verification-result strong{font-size:15px}
+.claim-v2 .verification-result p,.claim-v2 .opening-rule,.claim-v2 .opening-description{font-size:14px}
+.claim-v2 .pill-link{font-size:13px;font-weight:600}
+.modal-overlay{background:rgba(16,30,22,.38)}
+.modal{border-radius:24px;padding:32px 28px 26px;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.95);box-shadow:inset 0 1px 0 #fff,0 30px 80px rgba(16,30,22,.25)}
+.modal h2{font-size:26px;font-weight:700;letter-spacing:-.03em;color:#141a16}
+.modal>p{font-size:14px;color:#5f6862}
+.modal .eyebrow{font-size:12px;color:#127a55;font-weight:600}
+.modal .field{font-size:14px;color:#3f4b43}
+.modal .field input,.modal .field select,.modal .field textarea{font-size:15px;padding:12px;border-radius:11px}
+.modal .button.full{min-height:50px;border-radius:13px;font-size:15px;font-weight:600}
+.modal .button.primary{background:linear-gradient(180deg,#2c8a5e,#145c3d);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 20px rgba(20,92,61,.25)}
+.modal>small{font-size:13px;color:#7a847c}
+.modal-close{width:40px;height:40px;border-radius:10px;right:12px;top:12px}
+.modal-close:hover{background:#f0f4f0}
+.tr-share,.tr-unverified{max-width:760px;margin-left:auto;margin-right:auto}
+.tr-share{border-radius:20px;background:rgba(255,255,255,.82);border:1px solid rgba(255,255,255,.95);box-shadow:inset 0 1px 0 #fff,0 10px 30px rgba(20,40,30,.07)}
+.tr-share h2{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.tr-share p,.tr-share-status{font-size:14px}
+.tr-share-link{font-size:14px}
+.tr-unverified-head h2,.tr-unverified h2{font-size:17px;font-weight:600}
+.tr-unverified p,.tr-note{font-size:13px}
+.tr-unverified .event-info h3{font-size:15px}
+.tr-unverified .event-info p{font-size:13px}
