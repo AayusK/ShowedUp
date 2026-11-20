@@ -51,7 +51,7 @@ export function TrackRecordShare({ wallet, isMine }: { wallet: string; isMine: b
       <div className="tr-share-copy">
         <span className="eyebrow">SHARE IT</span>
         <h2>{isMine ? "Take your track record with you." : "Pass this track record along."}</h2>
-        <p>{isMine ? "Send this link to another club, or let them scan the code." : "Anyone with this link sees the same record."} It shows verified badges and a wallet address, never a name.</p>
+        <p>{isMine ? "Send this link to another club, or let them scan the code." : "Anyone with this link sees the same record."} This link shows public token badges. Share a downloaded receipt to show a private contribution.</p>
         <input className="tr-share-link" readOnly value={url} placeholder="Getting the link…" aria-label="Link to this track record" onFocus={(e) => e.currentTarget.select()}/>
         <div className="tr-share-actions">
           <button type="button" className="button primary" onClick={copy} disabled={!url}>{state === "copied" ? "Copied" : "Copy link"} <Icon name={state === "copied" ? "check" : "arrow"} size={16}/></button>

@@ -1,7 +1,7 @@
 // The live feed on the home page: badges the QuickNode Stream saw being handed out on Solana,
 // across every verified club. Shared by the browser and the server; nothing secret lives here.
 
-export interface FeedItem {
+interface TokenFeedItem {
   /** Shortened "abcd…wxyz". The full address is never sent. */
   wallet: string;
   /** Only for contribution badges (Volunteer, Speaker, ...). Null for attendance. */
@@ -15,6 +15,13 @@ export interface FeedItem {
   /** The transaction that minted the badge. */
   signature: string;
 }
+
+export type FeedItem = TokenFeedItem | {
+  kind: "receipt";
+  club: string;
+  at: string;
+  signature: string;
+};
 
 export interface FeedResponse {
   items: FeedItem[];

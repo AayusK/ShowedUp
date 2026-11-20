@@ -115,12 +115,13 @@ export default function ClaimView({ event, code, clubName }: { event: EventRecor
       const data = await res.json().catch(() => ({}));
       setClaimedWallet(wallet);
       if (cleanedName && (data.status === "success" || data.status === "already_claimed")) { setNameKnown(true); setEditingName(false); }
-      if (data.status === "success") { setTxSignature(data.signature); setClaim("success"); return; }
+      if (data.status === "success") { setTxSignature(data.signature ?? ""); setClaim("success"); return; }
       if (data.status === "already_claimed") { setClaim("duplicate"); return; }
       if (data.status === "expired") { setClaim("expired"); return; }
       switch (data.error) {
         case "name_required": setNameKnown(false); setError("Add your name so your organizer knows you’re here."); break;
         case "in_progress": setError("Your claim is already going through. Give it a few seconds."); break;
+        case "save_failed": setError("Your check-in couldn’t be saved. Scan the current code and try again."); break;
         case "bad_signature": setError("We couldn’t verify your wallet signature. Try again."); break;
         case "invalid_wallet": setError("That wallet address isn’t valid for claiming."); break;
         case "organizer_unfunded": setError("The organizer’s wallet is out of devnet SOL. Let them know."); break;
@@ -148,5 +149,5 @@ export default function ClaimView({ event, code, clubName }: { event: EventRecor
     {claim === "ready" && (!offerPhantom || embedded.enabled) && <>{askName && <label className="field claim-name">Your name<input ref={nameInputRef} type="text" placeholder="How your organizer will see you" autoComplete="name" maxLength={NAME_MAX} value={name} onChange={e=>setName(e.target.value)} disabled={busy !== null}/><small>{nameKnown ? "This replaces the name we have for this wallet." : "Only asked once. We’ll remember it for this wallet."}</small></label>}{hasWallet && nameKnown && !editingName && <p className="claim-name-known">Welcome back. <button type="button" className="text-link" onClick={()=>setEditingName(true)}>Change your name</button></p>}<button className="button primary full" onClick={doClaim} disabled={busy !== null || settingUp || (!hasWallet && embedded.enabled && !embedded.ready)}>{buttonLabel}<Icon name={hasWallet || embedded.enabled ? "arrow" : "wallet"} size={17}/></button>{error && <p className="form-error" role="alert">{error}</p>}<small className="claim-note">{busy === "signing" && !usingEmbedded ? "Signing is free and doesn’t send anything. It just proves this wallet is yours." : !hasWallet && embedded.enabled ? "Use your email or Google account. No app to install, no fees." : "No fees for you. Your organizer has it covered."}</small>{phantomOption && <p className="claim-name-known">Have a Phantom wallet? {offerPhantom ? <a className="text-link" href={phantomLink}>Open in Phantom</a> : <button type="button" className="text-link" onClick={()=>{ setClaimAfterConnect(true); setVisible(true); }}>Connect it instead</button>}</p>}{hasWallet && busy === null && <p className="claim-name-known">{usingEmbedded ? "Signed in" : "Connected"} · {shortWallet} <button type="button" className="text-link" onClick={()=>{ setError(""); if (usingEmbedded) void embedded.logout(); else void disconnect(); }}>{usingEmbedded ? "Sign out" : "Disconnect"}</button></p>}</>}
     {(claim === "success" || claim === "duplicate") && <><Link className="button primary full" href={profileHref}>View my attendance<Icon name="arrow" size={17}/></Link>{claim === "success" && txSignature && <a className="tx-link" href={explorerLink(txSignature, "tx")} target="_blank" rel="noreferrer"><Icon name="external" size={16}/>View transaction on Solana Explorer</a>}</>}
     {claim === "expired" && <Link className="button primary full" href="/">Back to overview<Icon name="arrow" size={17}/></Link>}
-    <div className="soulbound-note"><Icon name="shield" size={15}/> Yours to keep. Nontransferable by design.</div></div></div></main><SiteFooter /></>;
+    <div className="soulbound-note"><Icon name="shield" size={15}/> {event.mint ? "Your event badge is nontransferable." : "Your check-in is private to you and your club."}</div></div></div></main><SiteFooter /></>;
 }

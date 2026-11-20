@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { getEvent } from "@/lib/server/events";
-import { confirmClaim, recordExistingClaim, releaseClaim, reserveClaim } from "@/lib/server/claimsDb";
+import { checkIn, confirmClaim, recordExistingClaim, releaseClaim, reserveClaim } from "@/lib/server/claimsDb";
 import { isValidCode } from "@/lib/server/code";
 import { hasClaimed, mintAttendance, verifyWalletSignature } from "@/lib/server/claim";
 import { claimMessage } from "@/lib/claimMessage";
@@ -69,6 +69,14 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error("[api/claim] name save failed:", e instanceof Error ? e.message.split("\n")[0] : "unknown");
     return error("server_error", 500);
+  }
+
+  if (event.mint === null) {
+    try {
+      return NextResponse.json({ status: await checkIn(event.id, wallet58) });
+    } catch {
+      return error("save_failed", 503);
+    }
   }
 
   let reserved = false;

@@ -178,6 +178,8 @@ function ed25519Verify(signer: PublicKey, message: Uint8Array, signatureB58: str
  */
 export async function verifyReceipt(file: ReceiptFile, connection: Connection, trustedIssuer?: string): Promise<VerifyResult> {
   const hash = recordHash(file.record, file.salt);
+  if (hash !== file.receipt.hash) return { ok: false, reason: "edited" };
+  if (trustedIssuer && trustedIssuer !== file.receipt.issuer) return { ok: false, reason: "not_signed_by_issuer" };
   const issuer = new PublicKey(trustedIssuer ?? file.receipt.issuer);
 
   let tx;

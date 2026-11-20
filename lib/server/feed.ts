@@ -51,14 +51,18 @@ export function readFeed(): Promise<FeedResponse> {
 }
 
 async function readFeedUncached(): Promise<FeedResponse> {
-  const { data, error } = await db().from("chain_claims")
-    .select("signature, mint, wallet, block_time, received_at")
-    .order("received_at", { ascending: false })
-    .limit(READ_LIMIT);
-  if (error && MISSING_TABLE.has(error.code ?? "")) return { items: [], stream: "off" };
-  if (error) throw new Error(`chain_claims read failed: ${error.message}`);
-  const rows = (data ?? []) as ChainClaimRow[];
-  if (rows.length === 0) return { items: [], stream: "off" };
+  const [tokens, receipts] = await Promise.all([
+    db().from("chain_claims").select("signature, mint, wallet, block_time, received_at")
+      .order("received_at", { ascending: false }).limit(READ_LIMIT),
+    db().from("contribution_receipts").select("signature, streamed_at, issuer:receipt_file->receipt->>issuer")
+      .not("streamed_at", "is", null).not("confirmed_at", "is", null)
+      .order("streamed_at", { ascending: false }).limit(READ_LIMIT),
+  ]);
+  for (const result of [tokens, receipts]) {
+    if (result.error && !MISSING_TABLE.has(result.error.code)) throw new Error("Could not read the club feed");
+  }
+  const rows = (tokens.data ?? []) as ChainClaimRow[];
+  if (!rows.length && !receipts.data?.length) return { items: [], stream: "off" };
 
   const [events, clubs] = await Promise.all([readEvents(), readClubs()]);
   const eventsByMint = new Map(events.map((e) => [e.mint, e]));
@@ -88,9 +92,12 @@ async function readFeedUncached(): Promise<FeedResponse> {
         at: new Date(Number.isFinite(time) ? time : Date.now()).toISOString(),
         signature: row.signature,
       };
-    })
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .slice(0, SHOW_LIMIT);
-
-  return { items, stream: "on" };
+    });
+  const issuers = new Map(clubs.filter(c => c.verified).map(c => [c.issuer, c.name]));
+  for (const row of receipts.data ?? []) {
+    const club = issuers.get(String(row.issuer));
+    if (club) items.push({ kind: "receipt", club, at: row.streamed_at, signature: row.signature });
+  }
+  items.sort((a, b) => b.at.localeCompare(a.at));
+  return { items: items.slice(0, SHOW_LIMIT), stream: "on" };
 }

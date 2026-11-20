@@ -2,8 +2,8 @@ import "server-only";
 import { db } from "./db";
 
 // A claim row is a lock that works across every server instance: the (event_id, wallet)
-// primary key means only one request can hold it. The blockchain remains the source of truth
-// for attendance; this just stops two requests from minting at the same time.
+// primary key means only one request can hold it. For private events the confirmed row is the
+// check-in itself. Legacy events still use a reservation while their token is being minted.
 
 const STALE_MS = 2 * 60_000; // a "pending" row older than this is from a request that died
 
@@ -35,6 +35,14 @@ export async function confirmClaim(eventId: string, wallet: string, signature: s
     .update({ status: "confirmed", signature, updated_at: new Date().toISOString() })
     .eq("event_id", eventId).eq("wallet", wallet);
   if (error) console.error("[claims] confirm failed:", error.message); // token is minted either way
+}
+
+/** Single committed insert: parallel scans get one check-in and no Solana transaction. */
+export async function checkIn(eventId: string, wallet: string): Promise<"success" | "already_claimed"> {
+  const { error } = await db().from("claims").insert({ event_id: eventId, wallet, status: "confirmed" });
+  if (!error) return "success";
+  if (error.code === "23505") return "already_claimed";
+  throw new Error(`check-in failed: ${error.message}`);
 }
 
 /** Mark an already-held token as confirmed (e.g. claims from before the database existed). */

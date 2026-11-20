@@ -10,7 +10,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TrackRecordShare } from "@/components/TrackRecordShare";
 import { TrackRecordUnverified } from "@/components/TrackRecordUnverified";
-import { fetchProfile, type ProfileResult } from "@/lib/profileClient";
+import { signedRead } from "@/lib/privateAccess";
+import { fetchProfile, type Profile, type ProfileResult } from "@/lib/profileClient";
 import { useEmbeddedWallet } from "@/lib/embeddedWallet";
 import { ProfileRecord } from "./ProfileRecord";
 
@@ -18,7 +19,7 @@ import { ProfileRecord } from "./ProfileRecord";
 const SELF_ALIASES = new Set(["me", "demo"]);
 
 export default function ProfileView({ walletParam }: { walletParam: string }) {
-  const { publicKey, wallet, connecting } = useWallet();
+  const { publicKey, wallet, connecting, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
   // "Me" is a connected Phantom wallet, or the wallet that came with an email / Google sign-in.
   const embedded = useEmbeddedWallet();
@@ -62,6 +63,9 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
   if (isSelfRoute && !connectedWallet) {
     return message("wallet", "Your presence, collected.", "Connect your wallet to see the events you’ve shown up to.", <><button className="button primary full" style={{marginTop: 25}} onClick={() => setVisible(true)}>Connect wallet <Icon name="wallet" size={17}/></button><Link className="text-link" href="/verify" style={{marginTop: 20}}>Or verify any wallet <Icon name="arrow" size={16}/></Link></>);
   }
+  if (connectedWallet && target === connectedWallet) {
+    return shell(<OwnerRecord key={target} wallet={target} publicResult={result} sign={publicKey ? signMessage : embedded.signMessage} />);
+  }
   if (!result) {
     return message("spark", "Gathering the track record…", "Reading badges from Solana devnet.");
   }
@@ -69,13 +73,45 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
     return message("shield", "That’s not a wallet address.", "Check the link, or look up a wallet on the Verify page.", <Link className="button primary full" style={{marginTop: 25}} href="/verify">Verify attendance <Icon name="arrow" size={16}/></Link>);
   }
   if (!result.ok) {
-    return message("shield", "Couldn’t reach Solana devnet.", "Your attendance is safe on-chain. Refresh in a moment to try again.");
+    return message("shield", "Couldn’t reach Solana devnet.", "Refresh in a moment to load this wallet’s public badges.");
   }
-  const { profile } = result;
-  const isMine = profile.wallet === connectedWallet;
-  return shell(<>
-    <ProfileRecord key={profile.wallet} profile={profile} isMine={isMine} />
-    <TrackRecordUnverified badges={profile.unverified ?? []} total={profile.unverifiedTotal ?? 0}/>
+  return shell(<RecordContent profile={result.profile} isMine={false} />);
+}
+
+function RecordContent({ profile, isMine }: { profile: Profile; isMine: boolean }) {
+  return <>
+    <ProfileRecord profile={profile} isMine={isMine} />
+    <TrackRecordUnverified badges={profile.unverified} total={profile.unverifiedTotal}/>
     <TrackRecordShare wallet={profile.wallet} isMine={isMine}/>
-  </>);
+  </>;
+}
+
+function OwnerRecord({ wallet, publicResult, sign }: {
+  wallet: string; publicResult?: ProfileResult; sign?: (bytes: Uint8Array) => Promise<Uint8Array>;
+}) {
+  const [unlocked, setUnlocked] = useState<Profile | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function unlock() {
+    if (!sign || busy) return;
+    setBusy(true); setError("");
+    try {
+      const res = await signedRead(`/api/profile/${wallet}`, "profile", wallet, sign);
+      if (!res.ok) throw new Error();
+      setUnlocked(await res.json());
+    } catch {
+      setError("Couldn’t open your private record. Approve the wallet signature and try again.");
+    } finally { setBusy(false); }
+  }
+  const profile = unlocked ?? (publicResult?.ok ? publicResult.profile : null);
+  return <>
+    {(!unlocked || unlocked.partial) && <section className="panel">
+      <button className="button primary" onClick={unlock} disabled={busy || !sign}>
+        {busy ? "Opening private record…" : unlocked ? "Refresh private record" : "View my private check-ins and receipts"}
+      </button>
+      {!sign && <p>This wallet needs message signing to open your private record.</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </section>}
+    {profile && <RecordContent profile={profile} isMine/>}
+  </>;
 }

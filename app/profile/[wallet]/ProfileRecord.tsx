@@ -2,6 +2,7 @@
 
 import { useState, type KeyboardEvent } from "react";
 import Link from "next/link";
+import { ReceiptDownload } from "@/components/ReceiptDownload";
 import { Icon } from "@/components/Icon";
 import { shortAddress, type Profile, type ProfileEvent } from "@/lib/profileClient";
 import { explorerLink } from "@/lib/solana";
@@ -24,16 +25,17 @@ function BadgeRows({ events, showClub = true }: { events: ProfileEvent[]; showCl
       {events.map((event) => {
         const detail = [showClub && event.club.name, badgeDetail(event)].filter(Boolean).join(" · ");
         return (
-          <li className="profile-record-row" key={event.mint}>
+          <li className="profile-record-row" key={event.id}>
             <div className="profile-record-row-copy">
               <strong>{event.name}</strong>
-              {detail && <p>{detail}</p>}
+              {detail && <p>{detail}{!event.club.verified && " · Unverified club"}</p>}
+              {event.receiptFile && <><p>{String(event.receiptFile.record.summary ?? "")}</p><ReceiptDownload file={event.receiptFile} /></>}
             </div>
             <span className="profile-record-status">{event.kind === "attendance" ? "Attended" : event.role}</span>
-            <a className="profile-record-proof" href={explorerLink(event.mint)} target="_blank" rel="noreferrer"
-              aria-label={`View ${event.name} badge on Solana Explorer`}>
+            {(event.mint || event.receiptFile) && <a className="profile-record-proof" href={event.receiptFile ? explorerLink(event.receiptFile.receipt.signature, "tx") : explorerLink(event.mint!)} target="_blank" rel="noreferrer"
+              aria-label={`View proof for ${event.name} on Solana Explorer`}>
               <Icon name="external" size={15} />
-            </a>
+            </a>}
           </li>
         );
       })}
@@ -113,7 +115,7 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
                       <p>{roleCounts(terms.flatMap((term) => term.events)).join(" · ")}</p>
                     </div>
                     <a className="profile-record-proof" href={explorerLink(club.issuer)} target="_blank" rel="noreferrer"
-                      aria-label={`View ${club.name}’s verified issuer on Solana Explorer`}>
+                      aria-label={`View ${club.name}’s issuer on Solana Explorer`}>
                       <Icon name="external" size={15} />
                     </a>
                   </li>
@@ -121,7 +123,11 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
               </ul>
             )}
             {item.id === "attendance" && attendance.length > 0 && <BadgeRows events={attendance} />}
-            {item.id === "contributions" && contributions.length > 0 && <BadgeRows events={contributions} />}
+            {item.id === "contributions" && groupTrackRecord(contributions).map(({ club, terms }) => (
+              <div key={club.id}>{terms.map(term => <div key={term.label} className="profile-record-term">
+                <h3>{club.name} · {term.label}</h3><BadgeRows events={term.events} showClub={false}/>
+              </div>)}</div>
+            ))}
             {item.id === "by-club" && attendanceByClub.map(({ club, terms }, clubIndex) => (
               <details className="profile-record-group" key={club.id} open={clubIndex === 0}>
                 <summary>

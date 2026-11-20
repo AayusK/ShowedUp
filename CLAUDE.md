@@ -38,6 +38,8 @@ Other rules:
 
 ---
 
+**Current receipt workflow.** See the **Running an event** section in `README.md` and the current `SPEC.md`. New attendance uses private database rows. Officers issue one receipt per checked-in student, event and role. The token details in the early build history apply to legacy events.
+
 ## 2. What this is
 
 **ShowedUp**: proof of attendance for our student club on **Solana devnet**. It started as a
@@ -45,27 +47,26 @@ practice hackathon project (UBC 2026 prep, Consumer Apps track) and is now in re
 
 - An **organizer** creates an event, and a rotating QR code shows up on their laptop/projector.
 - An **attendee** scans it with their phone camera; it opens in Phantom, they connect and tap **Claim**.
-- The attendee gets 1 **soulbound** (non-transferable) token for that event. The organizer's
-  key pays every fee, so attendees never need SOL.
-- A **profile page** reads the wallet's tokens from the blockchain and shows a perk tier:
+- The app saves a private check-in. An officer can later confirm the attendee’s contribution.
+  The organizer pays the devnet fee for that receipt.
+- A student unlocks their **profile** to see check-ins, downloadable receipts, and legacy tokens. Verified attendance earns perk tiers:
   1 event = Showed Up, 3 = Regular, 5 = Core Member.
 
 Full details: `SPEC.md`. Setup and operations: `README.md`.
 
 ## 3. Current state: live and real
 
-**Live:** https://showedup-phi.vercel.app (Vercel, auto-deploys every push to `main`).
-**Database:** Supabase project "ShowedUp" (ref `gcgvglojxgaxycbxdach`) in the **CryptoClub**
-organization. Tables `events`, `claims` and `members` (wallet → display name, asked once per wallet), RLS on with **no public policies**: only the server's
-secret key can read or write them.
+**Live app** [showed-up.vercel.app](https://showed-up.vercel.app). Vercel builds this repository’s `main` branch.
+
+**Database** Supabase project `enzijcqcmlzeyhbizmov` stores events, check-ins, receipts, clubs, members and openings. The server uses the Supabase secret key.
 
 | Route | File | What it does |
 |---|---|---|
 | `/` | `app/page.tsx` → `app/HomeView.tsx` | Hero + the 3 most recent real events |
-| `/organizer` | `app/organizer/OrganizerView.tsx` | Password prompt, create event, event list with on-chain attendee counts |
+| `/organizer` | `app/organizer/OrganizerView.tsx` | Password prompt, create event, event list with private check-in and legacy token counts |
 | `/organizer/[id]` | `app/organizer/[id]/CheckinView.tsx` | Rotating QR (Phantom browse link), 30 s countdown, live "N people showed up", "Who’s here" names list |
 | `/claim/[eventId]?c=` | `app/claim/[eventId]/ClaimView.tsx` | Name (first claim per wallet) + sign message → claim; ready / success / already claimed / expired screens |
-| `/profile/[wallet]` | `app/profile/[wallet]/ProfileView.tsx` | On-chain attendance + tier; `me`/`demo` = connected wallet |
+| `/profile/[wallet]` | `app/profile/[wallet]/ProfileView.tsx` | Private check-ins, receipts, legacy badges and tier; `me`/`demo` = connected wallet |
 | `/verify` | `app/verify/VerifyView.tsx` | Look up any wallet (linked from My track record, not the header) |
 | `/organizer/[id]` (role badge) | `app/organizer/[id]/RecipientsView.tsx` | Who has a contribution badge, "Award to more people", Revoke |
 | `/openings/[id]` | `app/openings/[id]/OpeningView.tsx` | Opening with a rule: check, apply with a wallet signature |
@@ -74,7 +75,7 @@ Track-record routes (`app/api/`): `GET/POST clubs`, `PATCH clubs/[id]` (admin, v
 `POST events/[id]/revoke` (club passcode; burns as permanent delegate), `GET/POST openings`,
 `openings/[id]/{check,apply,applications}`, `GET feed` (live feed across clubs, no names).
 
-API routes (`app/api/`): `GET/POST events` (`?counts=1` adds attendee counts from mint supply),
+API routes (`app/api/`): `GET/POST events` (`?counts=1` adds attendee counts from the database or legacy mint supply),
 `GET events/[id]/code` (password), `GET events/[id]/attendees` (password; names), `POST claim` (saves the name),
 `GET members/[wallet]` (has a name yes/no, never the name), `GET profile/[wallet]`, `GET balance/[wallet]`,
 `POST organizer/verify` (password check).
@@ -168,10 +169,7 @@ Another optional variable: `PRIVY_APP_ID` turns on email / Google sign-in. It is
 design (not a secret); `app/layout.tsx` reads it on the server and passes it down, so it still
 isn't `NEXT_PUBLIC_*`. The server doesn't use `PRIVY_APP_SECRET`.
 
-**This repo's own test setup (`AayusK/ShowedUp`, since Nov 16):** `.env.local` on Aayus's Mac
-points at a separate Supabase project "ShowedUp" (ref `vrzcdxhjmdceaheuynpi`, organization
-"Impact Developers", same three tables, RLS on, no policies) and a separate organizer wallet
-(`Bn38cCVx4BHdZ6Zcx5rqJinMncYcGyqhJeJe3gfvpfce`), so testing never touches the club's live data.
+**This repository’s deployment.** `AayusK/ShowedUp` deploys to `aayusks-projects/showed-up`. At the receipt rollout, the local checkout and `showed-up.vercel.app` both used Supabase project `enzijcqcmlzeyhbizmov`. Test fixtures created locally can be visible on that site. The original club site at `showedup-phi.vercel.app` is a separate deployment.
 
 The organizer wallet (`8BdUdmWv4n1DaQMxfPUbVTTtNDd2NqcJz4r9BWkorexu`) needs devnet SOL: about
 0.003 SOL per new event and 0.002 SOL per new attendee. The app returns `organizer_unfunded`
