@@ -136,3 +136,73 @@ export async function eventAttendees(event: Pick<EventRecord, "id" | "mint">): P
     }))
     .sort((a, b) => time(b.at) - time(a.at));
 }
+
+export interface RosterEntry {
+  wallet: string;
+  /** Saved name for people who checked in to this club themselves; otherwise a short wallet. */
+  name: string;
+  /** Attendance badges from this club (QR scans plus officer adds), revoked ones left out. */
+  attended: number;
+  /** Role badges from this club, e.g. { Mentor: 1 }. */
+  roles: Record<string, number>;
+  /** Newest badge from this club (ISO date of the event), for sorting ties. */
+  lastEvent: string;
+}
+
+/**
+ * Everyone holding a badge from this club, with how many events they attended and which role
+ * badges they have, most active first. Reads the app's own claims plus what the QuickNode
+ * Stream saw on Solana, and leaves out revoked badges. Names follow the same rule as everywhere
+ * else: only people who checked in to this club themselves show a name.
+ */
+export async function clubRoster(events: EventRecord[]): Promise<RosterEntry[]> {
+  if (events.length === 0) return [];
+  const byId = new Map(events.map((e) => [e.id, e]));
+  const byMint = new Map(events.map((e) => [e.mint, e]));
+
+  const readClaims = (columns: string) =>
+    db().from("claims").select(columns).in("event_id", events.map((e) => e.id)).eq("status", "confirmed");
+  const [firstRead, streamed] = await Promise.all([
+    readClaims("wallet, event_id, revoked_at"),
+    db().from("chain_claims").select("wallet, mint").in("mint", events.map((e) => e.mint)),
+  ]);
+  // Before db/04_revocation.sql there is no revoked_at column: nobody has been revoked.
+  const recorded = firstRead.error && MISSING_COLUMN.has(firstRead.error.code ?? "") ? await readClaims("wallet, event_id") : firstRead;
+  if (recorded.error) throw new Error(`roster read failed: ${recorded.error.message}`);
+  const rows = (recorded.data ?? []) as unknown as { wallet: string; event_id: string; revoked_at?: string | null }[];
+
+  // One badge per (event, wallet); revoked ones don't count, whichever source saw them.
+  const revoked = new Set(rows.filter((r) => r.revoked_at).map((r) => `${r.event_id}:${r.wallet}`));
+  const held = new Set<string>();
+  for (const r of rows) if (!r.revoked_at) held.add(`${r.event_id}:${r.wallet}`);
+  for (const s of streamed.error ? [] : (streamed.data ?? [])) {
+    const event = byMint.get(s.mint as string);
+    if (!event) continue;
+    const key = `${event.id}:${s.wallet as string}`;
+    if (!revoked.has(key)) held.add(key);
+  }
+
+  const people = new Map<string, RosterEntry>();
+  for (const key of held) {
+    const split = key.indexOf(":");
+    const event = byId.get(key.slice(0, split));
+    const wallet = key.slice(split + 1);
+    if (!event) continue;
+    let p = people.get(wallet);
+    if (!p) { p = { wallet, name: `${wallet.slice(0, 4)}…${wallet.slice(-4)}`, attended: 0, roles: {}, lastEvent: "" }; people.set(wallet, p); }
+    if (event.kind === "contribution" && event.role) p.roles[event.role] = (p.roles[event.role] ?? 0) + 1;
+    else p.attended += 1;
+    if (event.date > p.lastEvent) p.lastEvent = event.date;
+  }
+  if (people.size === 0) return [];
+
+  // Names only for people who checked in to this club themselves (clubMembers applies that rule).
+  for (const m of await clubMembers(events)) {
+    const p = people.get(m.wallet);
+    if (p) p.name = m.name;
+  }
+  const badgeCount = (p: RosterEntry) => Object.values(p.roles).reduce((a, b) => a + b, 0);
+  return [...people.values()]
+    .sort((a, b) => b.attended - a.attended || badgeCount(b) - badgeCount(a) || b.lastEvent.localeCompare(a.lastEvent))
+    .slice(0, 500);
+}

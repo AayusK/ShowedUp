@@ -9,6 +9,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { formatDay } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
 import { termOf } from "@/lib/trackRecord";
+import { getTier } from "@/lib/tiers";
+import { timeAgo, type FeedItem } from "@/lib/feed";
 import { checkSession, clubHeaders, readSession, saveSession, type OrganizerSession } from "@/lib/organizerSession";
 import { OrganizerAccessModal, type Unlocked } from "@/components/OrganizerAccessModal";
 import { LEGACY_CLUB_ID, LEGACY_CLUB_NAME, type ClubInfo } from "@/lib/clubs";
@@ -94,7 +96,39 @@ export default function OrganizerView() {
 
   // Which part of the dashboard is open: the club's events, its openings, or (registry admin
   // only) the list of clubs.
-  const [tab, setTab] = useState<"events" | "openings" | "clubs">("events");
+  const [tab, setTab] = useState<"events" | "badges" | "members" | "openings" | "activity" | "clubs">("events");
+
+  // Members tab: everyone holding one of this club's badges, most active first.
+  type RosterEntry = { wallet: string; name: string; attended: number; roles: Record<string, number> };
+  const [roster, setRoster] = useState<RosterEntry[] | null>(null);
+  const [rosterError, setRosterError] = useState(false);
+  useEffect(() => {
+    if (tab !== "members" || !session) return;
+    let cancelled = false;
+    setRosterError(false);
+    fetch(`/api/clubs/${session.clubId}/roster`, { cache: "no-store", headers: clubHeaders(session) })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { roster?: RosterEntry[] }) => { if (!cancelled) setRoster(d.roster ?? []); })
+      .catch(() => { if (!cancelled) { setRoster([]); setRosterError(true); } });
+    return () => { cancelled = true; };
+  }, [tab, session]);
+
+  // Activity tab: the live feed across clubs (QuickNode Streams), narrowed to this club. Polls
+  // every 15 s while the tab is open.
+  const [activity, setActivity] = useState<{ items: FeedItem[]; stream: string; now: Date } | null>(null);
+  useEffect(() => {
+    if (tab !== "activity") return;
+    let cancelled = false;
+    const load = () => fetch("/api/feed", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { items?: FeedItem[]; stream?: string } | null) => {
+        if (!cancelled && d) setActivity({ items: d.items ?? [], stream: d.stream ?? "off", now: new Date() });
+      })
+      .catch(() => {});
+    void load();
+    const timer = window.setInterval(load, 15_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [tab]);
   // How many applications are waiting for a decision, for the dot on the Openings icon.
   const [pending, setPending] = useState(0);
   useEffect(() => {
@@ -199,7 +233,9 @@ export default function OrganizerView() {
   const today = todayLocal();
   const upcoming = (events ?? []).filter((e) => e.kind !== "contribution" && e.date.slice(0, 10) >= today)
     .sort((a, b) => a.date.localeCompare(b.date));
-  const past = (events ?? []).filter((e) => !upcoming.includes(e));
+  const past = (events ?? []).filter((e) => e.kind !== "contribution" && !upcoming.includes(e));
+  const roleBadges = (events ?? []).filter((e) => e.kind === "contribution");
+  const clubActivity = activity ? activity.items.filter((i) => i.club === (club?.name ?? (clubId === LEGACY_CLUB_ID ? LEGACY_CLUB_NAME : ""))) : null;
   const hosted = (events ?? []).filter((e) => e.kind !== "contribution");
   // Only show check-ins when every event has an on-chain count; never a made-up number.
   const checkins = hosted.length > 0 && hosted.every((e) => e.attendees !== undefined)
@@ -257,7 +293,10 @@ export default function OrganizerView() {
   <main className="dash">
     <nav className="dash-rail" aria-label="Club dashboard">
       <button type="button" className={tab === "events" ? "on" : ""} onClick={() => setTab("events")} aria-current={tab === "events" ? "page" : undefined}><Icon name="calendar" size={19}/><span>Events</span></button>
-      <button type="button" className={tab === "openings" ? "on" : ""} onClick={() => setTab("openings")} disabled={!session} aria-current={tab === "openings" ? "page" : undefined}><Icon name="people" size={19}/><span>Openings</span>{pending > 0 && <i className="dash-dot" aria-label={`${pending} to decide`}/>}</button>
+      <button type="button" className={tab === "badges" ? "on" : ""} onClick={() => setTab("badges")} disabled={!session} aria-current={tab === "badges" ? "page" : undefined}><Icon name="spark" size={19}/><span>Badges</span></button>
+      <button type="button" className={tab === "members" ? "on" : ""} onClick={() => setTab("members")} disabled={!session} aria-current={tab === "members" ? "page" : undefined}><Icon name="people" size={19}/><span>Members</span></button>
+      <button type="button" className={tab === "openings" ? "on" : ""} onClick={() => setTab("openings")} disabled={!session} aria-current={tab === "openings" ? "page" : undefined}><Icon name="door" size={19}/><span>Openings</span>{pending > 0 && <i className="dash-dot" aria-label={`${pending} to decide`}/>}</button>
+      <button type="button" className={tab === "activity" ? "on" : ""} onClick={() => setTab("activity")} disabled={!session} aria-current={tab === "activity" ? "page" : undefined}><Icon name="pulse" size={19}/><span>Activity</span></button>
       {admin && <button type="button" className={tab === "clubs" ? "on" : ""} onClick={() => setTab("clubs")} aria-current={tab === "clubs" ? "page" : undefined}><Icon name="shield" size={19}/><span>Clubs</span></button>}
       <span className="dash-rail-end" title={session ? `${clubName} · signed in` : "Not signed in"}>{session ? initials : "?"}</span>
     </nav>
@@ -269,7 +308,7 @@ export default function OrganizerView() {
           {session && <p>{club?.verified !== false && <span className="dash-verified"><Icon name="shield" size={13}/> Verified issuer</span>}{term && <span>{term}</span>}<button className="dash-lock" onClick={lock}>Lock</button></p>}
         </div>
         <span className="dash-spacer"/>
-        {session && tab === "events" && <>
+        {session && (tab === "events" || tab === "badges") && <>
           <button className="button secondary" onClick={() => setAward(null)}><Icon name="spark" size={16}/> Award a badge</button>
           <button className="button primary" onClick={openCreate}><Icon name="plus" size={16}/> New event</button>
         </>}
@@ -292,6 +331,44 @@ export default function OrganizerView() {
         {events !== null && events.length === 0 && <p className="dash-empty">{loadError ? "Couldn’t load events. Refresh to try again." : "No events yet. Create one to get a check-in QR code."}</p>}
         {upcoming.length > 0 && <><h2 className="dash-h">Next</h2><ul className="dash-list">{upcoming.map((e, i) => eventRow(e, i === 0))}</ul></>}
         {past.length > 0 && <><h2 className="dash-h">Past</h2><ul className="dash-list">{past.map((e) => eventRow(e))}</ul></>}
+      </>}
+
+      {session && tab === "badges" && <>
+        <p className="dash-lede">Role badges your club gave for what people did: mentoring, speaking, volunteering. Each one is on the person’s track record.</p>
+        {events === null ? <ul className="dash-list"><li className="dash-row"><div className="skeleton" style={{height: 14, width: "40%"}}/></li></ul>
+          : roleBadges.length === 0 ? <p className="dash-empty">No role badges yet. Use “Award a badge” to give someone a Mentor, Speaker or Volunteer badge.</p>
+          : <ul className="dash-list">{roleBadges.map((e) => <li key={e.id} className="dash-row">
+              <span className={`rec-pill rec-role-${e.role}`}>{e.role}</span>
+              <span className="dash-name"><strong>{e.name}</strong><span className="dash-sub">{formatDay(e.date)}</span></span>
+              {e.attendees !== undefined && <span className="dash-num">{e.attendees}<small>{e.attendees === 1 ? " person" : " people"}</small></span>}
+              <Link className="dash-open" href={`/organizer/${e.id}`}>Recipients <Icon name="arrow" size={14}/></Link>
+              <button type="button" className="button secondary dash-small" onClick={() => setAward({ id: e.id, name: e.name, role: e.role })}><Icon name="plus" size={14}/> Award more</button>
+            </li>)}</ul>}
+      </>}
+
+      {session && tab === "members" && <>
+        <p className="dash-lede">Everyone holding one of your club’s badges, most active first. Names show only for people who checked in themselves.</p>
+        {roster === null ? <ul className="dash-list"><li className="dash-row"><div className="skeleton" style={{height: 14, width: "40%"}}/></li></ul>
+          : rosterError ? <p className="dash-empty">Couldn’t load members. Refresh to try again.</p>
+          : roster.length === 0 ? <p className="dash-empty">No members yet. They appear here after their first check-in.</p>
+          : <ul className="dash-list">{roster.map((m, i) => { const tier = getTier(m.attended); return <li key={m.wallet} className="dash-row">
+              <span className="dash-rank">{i + 1}</span>
+              <span className="dash-av" aria-hidden="true">{Array.from(m.name)[0]?.toUpperCase()}</span>
+              <span className="dash-name"><strong>{m.name}</strong>{tier && <span className="dash-sub">{tier.name}</span>}{Object.entries(m.roles).map(([role, n]) => <span key={role} className={`rec-pill rec-role-${role}`}>{n > 1 ? `${n} × ` : ""}{role}</span>)}</span>
+              <span className="dash-num">{m.attended}<small>{m.attended === 1 ? " event" : " events"}</small></span>
+              <Link className="dash-open" href={`/profile/${m.wallet}`}>Track record <Icon name="arrow" size={14}/></Link>
+            </li>; })}</ul>}
+      </>}
+
+      {session && tab === "activity" && <>
+        <p className="dash-lede"><span className="ci-live">Live on Solana</span> Check-ins and badges from your club, as QuickNode Streams sees them on-chain.</p>
+        {clubActivity === null ? <ul className="dash-list"><li className="dash-row"><div className="skeleton" style={{height: 14, width: "40%"}}/></li></ul>
+          : clubActivity.length === 0 ? <p className="dash-empty">{activity?.stream === "off" ? "The live stream isn’t connected right now. Check-ins still work; they just won’t show here." : "Nothing new yet. Check-ins and badges show up here within seconds."}</p>
+          : <ul className="dash-list">{clubActivity.map((item) => <li key={item.signature} className="dash-row">
+              <span className={`home2-feed-ic${item.kind === "contribution" ? " is-role" : ""}`}><Icon name={item.kind === "contribution" ? "spark" : "check"} size={15}/></span>
+              <span className="dash-name"><strong>{item.role ?? "Checked in"}</strong><span className="dash-sub">{item.eventName} · <code>{item.wallet}</code></span></span>
+              <a className="dash-open" href={explorerLink(item.signature, "tx")} target="_blank" rel="noreferrer">{activity ? timeAgo(item.at, activity.now) : ""} <Icon name="external" size={13}/></a>
+            </li>)}</ul>}
       </>}
 
       {session && tab === "openings" && <OpeningsPanel session={session} club={club} />}
