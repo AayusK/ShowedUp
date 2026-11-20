@@ -1,9 +1,8 @@
 // QuickNode Streams filter for ShowedUp.
 //
 // Where it runs: inside QuickNode, on every new Solana devnet block (dataset "Block").
-// What it does: keeps only the transactions where our organizer wallet handed someone an
-// attendance token, and sends ShowedUp one small record per claim. Blocks with no claims
-// send nothing.
+// Keeps club receipt memos paid by our organizer, plus legacy token claims.
+// A receipt delivery contains its signature, hash and block time.
 //
 // Setup: paste this whole file into the stream's filter editor and set ORGANIZER below to
 // your organizer wallet address (README, "Live claim feed").
@@ -11,10 +10,34 @@
 const ORGANIZER = "Bn38cCVx4BHdZ6Zcx5rqJinMncYcGyqhJeJe3gfvpfce";
 const TOKEN_2022 = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 
+const MEMO_V2 = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr";
+const PREFIX = "showedup:v1:";
+
+// Raw RPC blocks encode instruction bytes in base58. QuickNode's filter has no Node imports.
+function memoText(data) {
+  if (typeof data !== "string" || data.length > 110) return "";
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const bytes = [];
+  for (const char of data) {
+    let carry = alphabet.indexOf(char);
+    if (carry < 0) return "";
+    for (let i = 0; i < bytes.length; i++) {
+      carry += bytes[i] * 58;
+      bytes[i] = carry & 255;
+      carry >>= 8;
+    }
+    while (carry) { bytes.push(carry & 255); carry >>= 8; }
+  }
+  return String.fromCharCode(...bytes.reverse());
+}
+
+// QuickNode calls this entry point by name.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- QuickNode invokes main.
 function main(stream) {
   var data = stream && stream.data;
   var blocks = Array.isArray(data) ? data : [data];
   var claims = [];
+  var receipts = [];
 
   for (var i = 0; i < blocks.length; i++) {
     // Some datasets wrap each batch in another array; accept both.
@@ -34,6 +57,16 @@ function main(stream) {
         // The first account is the fee payer. Every ShowedUp claim is paid by the organizer.
         var feePayer = typeof keys[0] === "string" ? keys[0] : keys[0].pubkey;
         if (feePayer !== ORGANIZER) continue;
+
+        for (const ix of message.instructions || []) {
+          const key = keys[ix.programIdIndex];
+          const program = ix.programId || (typeof key === "string" ? key : key && key.pubkey);
+          if (program !== MEMO_V2) continue;
+          const text = typeof ix.parsed === "string" ? ix.parsed : memoText(ix.data);
+          if (!/^showedup:v1:[a-f0-9]{64}$/.test(text)) continue;
+          receipts.push({ signature: tx.transaction.signatures[0], hash: text.slice(PREFIX.length),
+            blockTime: block.blockTime || null });
+        }
 
         // Token balances before and after the transaction, per token account.
         var before = {};
@@ -61,5 +94,6 @@ function main(stream) {
     }
   }
 
+  if (receipts.length) return { claims: claims, receipts: receipts };
   return claims.length ? { claims: claims } : null;
 }
