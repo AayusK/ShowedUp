@@ -4,11 +4,10 @@ import React, { useCallback, useEffect, useRef, useState, type FormEvent, type R
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { Badge } from "@/components/Badge";
 import { SiteHeader } from "@/components/SiteHeader";
-import { SiteFooter } from "@/components/SiteFooter";
-import { dateTile, formatDay, formatEventDetail } from "@/lib/format";
+import { formatDay } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
+import { termOf } from "@/lib/trackRecord";
 import { checkSession, clubHeaders, readSession, saveSession, type OrganizerSession } from "@/lib/organizerSession";
 import { OrganizerAccessModal, type Unlocked } from "@/components/OrganizerAccessModal";
 import { LEGACY_CLUB_ID, LEGACY_CLUB_NAME, type ClubInfo } from "@/lib/clubs";
@@ -27,25 +26,6 @@ interface EventItem {
   /** "contribution" badges are awarded by an officer; everything else is QR-code attendance. */
   kind?: string;
   role?: string;
-}
-
-function useCountUp(target: number | null, duration = 900): number {
-  const [val, setVal] = useState(0);
-  const rafRef = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    if (target === null) return;
-    const finalVal = target;
-    if (rafRef.current !== undefined) cancelAnimationFrame(rafRef.current);
-    const start = performance.now();
-    function step(now: number) {
-      const p = Math.min((now - start) / duration, 1);
-      setVal(Math.round(finalVal * (1 - (1 - p) ** 3)));
-      if (p < 1) rafRef.current = requestAnimationFrame(step);
-    }
-    rafRef.current = requestAnimationFrame(step);
-    return () => { if (rafRef.current !== undefined) cancelAnimationFrame(rafRef.current); };
-  }, [target, duration]);
-  return val;
 }
 
 function todayLocal() {
@@ -101,14 +81,32 @@ export default function OrganizerView() {
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
   // Restore the sign-in for this browser session, dropping it if it no longer works.
+  const [sessionChecked, setSessionChecked] = useState(false);
   useEffect(() => {
     const saved = readSession();
-    if (!saved) return;
+    if (!saved) { setSessionChecked(true); return; }
     checkSession(saved).then((check) => {
       if (check.ok) { setSession(saved); setClub(check.club ?? null); setAdmin(!!check.admin); }
       else saveSession(null);
-    }).catch(() => setSession(saved));
+    }).catch(() => setSession(saved)).finally(() => setSessionChecked(true));
   }, []);
+
+  // Which part of the dashboard is open: the club's events, its openings, or (registry admin
+  // only) the list of clubs.
+  const [tab, setTab] = useState<"events" | "openings" | "clubs">("events");
+  // How many applications are waiting for a decision, for the dot on the Openings icon.
+  const [pending, setPending] = useState(0);
+  useEffect(() => {
+    if (!session) { setPending(0); return; }
+    let cancelled = false;
+    fetch("/api/openings?mine=1", { cache: "no-store", headers: clubHeaders(session) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { openings?: { pending?: number }[] } | null) => {
+        if (!cancelled) setPending((d?.openings ?? []).reduce((n, o) => n + (o.pending ?? 0), 0));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [session, tab]);
 
   useEffect(() => {
     const close = (e: KeyboardEvent) => { if (e.key === "Escape" && !createBusy) { setCreateModal(false); setAccessModal(false); } };
@@ -138,6 +136,7 @@ export default function OrganizerView() {
   }
 
   function lock() {
+    setTab("events");
     saveSession(null);
     setSession(null);
     setClub(null);
@@ -195,34 +194,109 @@ export default function OrganizerView() {
     }
   }
 
-  // "Events hosted" and "check-ins" count attendance events; contribution badges are listed but
-  // aren't check-ins.
-  const hosted = events?.filter(e => e.kind !== "contribution") ?? [];
-  const count = hosted.length;
+  // Upcoming attendance events (today or later) soonest first; everything else newest first.
+  const today = todayLocal();
+  const upcoming = (events ?? []).filter((e) => e.kind !== "contribution" && e.date.slice(0, 10) >= today)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const past = (events ?? []).filter((e) => !upcoming.includes(e));
+  const hosted = (events ?? []).filter((e) => e.kind !== "contribution");
   // Only show check-ins when every event has an on-chain count; never a made-up number.
-  const checkins = hosted.length > 0 && hosted.every(e => e.attendees !== undefined)
-    ? hosted.reduce((sum, e) => sum + (e.attendees ?? 0), 0)
-    : null;
+  const checkins = hosted.length > 0 && hosted.every((e) => e.attendees !== undefined)
+    ? hosted.reduce((sum, e) => sum + (e.attendees ?? 0), 0) : null;
+  const badges = (events ?? []).filter((e) => e.kind === "contribution").reduce((n, e) => n + (e.attendees ?? 0), 0);
+  const clubName = club?.name ?? (clubId === LEGACY_CLUB_ID ? LEGACY_CLUB_NAME : "Your club");
+  const initials = clubName.split(/\s+/).filter((w) => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "C";
 
-  const animCount = useCountUp(events !== null ? count : null);
-  const animCheckins = useCountUp(checkins);
+  // The ··· menu on an event row: which row's menu is open.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!menuFor) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
+      if (e.type === "pointerdown" && (e.target as HTMLElement).closest?.(".dash-menu-wrap")) return;
+      setMenuFor(null);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", close);
+    return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", close); };
+  }, [menuFor]);
+  const term = termOf(today)?.label;
+
+  function openAccess() { setOpenCreateAfterAccess(false); setAccessError(""); setAccessModal(true); }
+
+  const eventRow = (e: EventItem, next = false) => {
+    const contribution = e.kind === "contribution";
+    return <li key={e.id} className={`dash-row${next ? " dash-row-next" : ""}`}>
+      <span className="dash-date">{formatDay(e.date).replace(/, \d{4}$/, "")}</span>
+      <span className="dash-name"><strong>{e.name}</strong>{contribution
+        ? <span className="dash-tag">{e.role} badge</span>
+        : e.location && <span className="dash-sub">{e.location}</span>}</span>
+      {next
+        ? <Link className="button primary dash-go" href={`/organizer/${e.id}`}>Start check-in <Icon name="arrow" size={15}/></Link>
+        : <>
+          {e.attendees !== undefined && <span className="dash-num">{e.attendees}<small>{contribution ? (e.attendees === 1 ? " recipient" : " recipients") : " came"}</small></span>}
+        </>}
+      <div className="dash-menu-wrap">
+        <button type="button" className="dash-more" aria-haspopup="menu" aria-expanded={menuFor === e.id} aria-label={`Actions for ${e.name}`} onClick={() => setMenuFor(menuFor === e.id ? null : e.id)}>···</button>
+        {menuFor === e.id && <div className="dash-menu" role="menu">
+          {contribution ? <>
+            <Link role="menuitem" href={`/organizer/${e.id}`}><Icon name="people" size={16}/> See recipients</Link>
+            <button role="menuitem" type="button" onClick={() => { setMenuFor(null); setAward({ id: e.id, name: e.name, role: e.role }); }}><Icon name="spark" size={16}/> Award to more people</button>
+          </> : <>
+            <Link role="menuitem" href={`/organizer/${e.id}`}><Icon name="calendar" size={16}/> {next ? "Start check-in" : "Open check-in"}</Link>
+            <Link role="menuitem" href={`/organizer/${e.id}`}><Icon name="people" size={16}/> Who showed up</Link>
+          </>}
+          <a role="menuitem" href={explorerLink(e.mint)} target="_blank" rel="noreferrer"><Icon name="external" size={16}/> View badge on Solana</a>
+        </div>}
+      </div>
+    </li>;
+  };
 
   return <><SiteHeader view="organizer" />
-  <main className="shell">
-    <div className="page-intro"><div className="organizer-access"><Badge>Organizer workspace</Badge>{password
-      ? <button className="text-link" onClick={lock}><Icon name="shield" size={14}/> Organizer access · Lock</button>
-      : <button className="text-link" onClick={()=>{ setOpenCreateAfterAccess(false); setAccessError(""); setAccessModal(true); }}><Icon name="shield" size={14}/> Organizer access</button>}</div><h1>Bring people together.</h1><p>You make the space. We’ll remember who showed up.</p></div>
-    <div className="stats" style={{gridTemplateColumns: `repeat(${checkins !== null ? 2 : 1}, 1fr)`}}><div><span>Events hosted</span><strong>{events === null ? "–" : animCount}</strong><small>{count === 0 ? "Your first one is a click away" : "A growing community"}</small></div>{checkins !== null && <div><span>Total check-ins</span><strong>{animCheckins}</strong><small>{checkins === 1 ? "1 moment of connection" : `${checkins} moments of connection`}</small></div>}</div>
-    <div className="section-heading"><div><span className="eyebrow">{(club?.name ?? (clubId === LEGACY_CLUB_ID ? LEGACY_CLUB_NAME : "Your club")).toUpperCase()}</span><h2>Your events</h2></div><div className="heading-actions">{session && <button className="button secondary" onClick={() => setAward(null)}><Icon name="spark" size={17}/> Award contribution</button>}<button className="button primary" onClick={openCreate}><Icon name="plus" size={17}/> Create event</button></div></div>
-    <div className="panel event-list">
-      {events === null && [0, 1, 2].map(i => <div className="event-row" key={i}><div className="skeleton" style={{width:45,height:51,borderRadius:10,flexShrink:0}}/><div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}><div className="skeleton" style={{height:17,width:"50%"}}/><div className="skeleton" style={{height:11,width:"32%",marginTop:4}}/></div></div>)}
-      {events !== null && events.length === 0 && <div className="event-row"><div className="event-info"><h3>{loadError ? "Couldn’t load events." : "No events yet."}</h3><p>{loadError ? "Refresh the page to try again." : "Create your first event to get a check-in QR code."}</p></div></div>}
-      {events?.map((e, i) => { const tile = dateTile(e.date); return <div className="event-row" key={e.id} style={{"--row-i": i} as React.CSSProperties}><div className="date-tile"><small>{tile.month}</small>{tile.day}</div><div className="event-info"><h3>{e.name}</h3><p>{e.kind === "contribution" ? `${e.role} badge · ${formatDay(e.date)}` : formatEventDetail(e.date, e.location)}</p></div>{e.attendees !== undefined && <span className="row-count"><Icon name="people" size={16}/>{e.attendees} {e.kind === "contribution" ? (e.attendees === 1 ? "recipient" : "recipients") : (e.attendees === 1 ? "attendee" : "attendees")}</span>}<a className="pill-link" href={explorerLink(e.mint)} target="_blank" rel="noreferrer">Event token <Icon name="external" size={14}/></a><Link className="button secondary" href={`/organizer/${e.id}`}>{e.kind === "contribution" ? "View recipients" : "Open check-in"}<Icon name="arrow" size={16}/></Link></div>; })}
+  <main className="dash">
+    <nav className="dash-rail" aria-label="Club dashboard">
+      <button type="button" className={tab === "events" ? "on" : ""} onClick={() => setTab("events")} aria-current={tab === "events" ? "page" : undefined}><Icon name="calendar" size={19}/><span>Events</span></button>
+      <button type="button" className={tab === "openings" ? "on" : ""} onClick={() => setTab("openings")} disabled={!session} aria-current={tab === "openings" ? "page" : undefined}><Icon name="people" size={19}/><span>Openings</span>{pending > 0 && <i className="dash-dot" aria-label={`${pending} to decide`}/>}</button>
+      {admin && <button type="button" className={tab === "clubs" ? "on" : ""} onClick={() => setTab("clubs")} aria-current={tab === "clubs" ? "page" : undefined}><Icon name="shield" size={19}/><span>Clubs</span></button>}
+      <span className="dash-rail-end" title={session ? `${clubName} · signed in` : "Not signed in"}>{session ? initials : "?"}</span>
+    </nav>
+    <div className="dash-main">
+      <div className="dash-bar">
+        {session && <span className="dash-club-tile" aria-hidden="true">{initials}</span>}
+        <div className="dash-title">
+          <h1>{session ? clubName : "Club dashboard"}</h1>
+          {session && <p>{club?.verified !== false && <span className="dash-verified"><Icon name="shield" size={13}/> Verified issuer</span>}{term && <span>{term}</span>}<button className="dash-lock" onClick={lock}>Lock</button></p>}
+        </div>
+        <span className="dash-spacer"/>
+        {session && tab === "events" && <>
+          <button className="button secondary" onClick={() => setAward(null)}><Icon name="spark" size={16}/> Award a badge</button>
+          <button className="button primary" onClick={openCreate}><Icon name="plus" size={16}/> New event</button>
+        </>}
+      </div>
+
+      {!session && sessionChecked && <div className="dash-signin">
+        <Icon name="shield" size={22}/>
+        <div><strong>Sign in to your club</strong><span>Use your club’s passcode to create events, run check-in and see who showed up.</span></div>
+        <button className="button primary" onClick={openAccess}>Enter passcode <Icon name="arrow" size={15}/></button>
+      </div>}
+
+      {session && tab === "events" && <>
+        <div className="dash-kpis">
+          <span><strong>{events === null ? "–" : hosted.length}</strong> {hosted.length === 1 ? "event" : "events"}</span>
+          <span><strong>{checkins ?? "–"}</strong> check-ins</span>
+          <span><strong>{events === null ? "–" : badges}</strong> {badges === 1 ? "role badge" : "role badges"}</span>
+          {pending > 0 && <button className="dash-pending" onClick={() => setTab("openings")}>{pending} {pending === 1 ? "application" : "applications"} to decide →</button>}
+        </div>
+        {events === null && <ul className="dash-list">{[0, 1, 2].map((i) => <li className="dash-row" key={i}><div className="skeleton" style={{height: 14, width: "40%"}}/></li>)}</ul>}
+        {events !== null && events.length === 0 && <p className="dash-empty">{loadError ? "Couldn’t load events. Refresh to try again." : "No events yet. Create one to get a check-in QR code."}</p>}
+        {upcoming.length > 0 && <><h2 className="dash-h">Next</h2><ul className="dash-list">{upcoming.map((e, i) => eventRow(e, i === 0))}</ul></>}
+        {past.length > 0 && <><h2 className="dash-h">Past</h2><ul className="dash-list">{past.map((e) => eventRow(e))}</ul></>}
+      </>}
+
+      {session && tab === "openings" && <OpeningsPanel session={session} club={club} />}
+      {session && admin && tab === "clubs" && <ClubsPanel adminPassword={session.password} />}
     </div>
-    <div className="subtle-notice"><Icon name="shield"/>Creating an event needs your club’s passcode. Each event gets its own nontransferable token on Solana devnet, issued from your club’s wallet.</div>
-    {admin && session && <ClubsPanel adminPassword={session.password} />}
-    {session && <OpeningsPanel session={session} club={club} />}
-  </main><SiteFooter />
+  </main>
   {award !== false && session && <AwardModal session={session} existing={award ?? undefined} onClose={() => setAward(false)} onChanged={loadEvents} />}
   {accessModal && <OrganizerAccessModal initialError={accessError} onClose={()=>setAccessModal(false)} onUnlocked={onUnlocked} />}
   {createModal && <div className="modal-overlay" onClick={()=>!createBusy && setCreateModal(false)}><form role="dialog" aria-modal="true" aria-label="Create event" className="modal" onClick={e=>e.stopPropagation()} onSubmit={submitCreate}><button type="button" className="modal-close" aria-label="Close" disabled={createBusy} onClick={()=>setCreateModal(false)}>×</button><span className="eyebrow">MAKE ROOM FOR SOMETHING GOOD</span><h2>A reason to show up.</h2><p>Create an event for your community.</p><label className="field">Event name<input value={name} maxLength={80} placeholder="e.g. Builders Meeting" onChange={e=>setName(e.target.value)}/></label><div className="form-columns"><label className="field">Date<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label><label className="field">Time<input type="time" value={time} onChange={e=>setTime(e.target.value)}/></label></div><label className="field">Location<input value={location} maxLength={80} placeholder="e.g. UBC Nest, Room 2504 (optional)" onChange={e=>setLocation(e.target.value)}/></label><button type="submit" className="button primary full" disabled={createBusy}>{createBusy ? "Creating event token…" : "Create event"} <Icon name="arrow" size={16}/></button>{createError && <p className="form-error" role="alert">{createError}</p>}<small>Creates a nontransferable Token-2022 token on Solana devnet. The organizer wallet pays the fee. Takes a few seconds.</small></form></div>}

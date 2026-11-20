@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { Icon } from "@/components/Icon";
-import { Badge } from "@/components/Badge";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { OrganizerAccessModal } from "@/components/OrganizerAccessModal";
@@ -220,32 +219,41 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
   const qrValue = claimUrl ? (signInEnabled ? claimUrl : phantomBrowseLink(claimUrl, origin)) : "";
 
   return <><SiteHeader view="event" />
-  <main className="shell">
-    <Link className="back-link" href="/organizer">← All events</Link>
-    <div className="checkin-layout with-roster"><div><Badge>{club.name} · Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>Tap Claim. Your organizer covers the fees.</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}<button type="button" className="button secondary present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button></div>
-      <div className={`qr-panel${urgency ? " " + urgency : ""}`}><div className="qr-title"><span className="brand mini"><span className="brand-mark">↗</span>ShowedUp</span><span className="quiet-pill">DEVNET</span></div><h2>You’re in the right place.</h2><p>Scan to claim your attendance.</p>
+  <main className="shell ci">
+    <div className="ci-head">
+      <div className="ci-title">
+        <Link className="ci-back" href="/organizer">← {club.name}</Link>
+        <h1>{event.name}</h1>
+        <p>{formatDay(event.date)} · {formatTime(event.date)}{event.location && <> · {event.location}</>} · <a href={explorerLink(event.mint)} target="_blank" rel="noreferrer">Badge on Solana <Icon name="external" size={13}/></a></p>
+      </div>
+      <button type="button" className="button primary ci-present present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button>
+    </div>
+    <div className="ci-grid">
+      <section className={`ci-card ci-qr qr-panel${urgency ? " " + urgency : ""}`} aria-label="Check-in QR code">
+        <div className="ci-card-head"><span className="ci-live">Check-in is open</span><span className="ci-how">{signInEnabled ? "Scan with a phone camera · sign in · tap Claim" : "Scan with a phone camera · opens in Phantom · tap Claim"}</span></div>
         <div className="qr-wrap">{claimUrl
-          ? <QRCodeSVG value={qrValue} size={224} fgColor="#173d2d" level="M" marginSize={1}/>
+          ? <QRCodeSVG value={qrValue} size={260} fgColor="#173d2d" level="M" marginSize={1}/>
           : <div style={{aspectRatio: "1", display: "grid", placeItems: "center"}}><p>{!checkedSaved || password ? "Loading code…" : "Club passcode needed to show the code."}</p></div>}</div>
-        <div className="code-line">CODE <strong>{code ?? "······"}</strong><span>Refreshes in {seconds}s</span></div>
+        <div className="code-line">CODE <strong>{code ?? "······"}</strong><span>{code ? `New code in ${seconds}s` : ""}</span></div>
         <div className="countdown-track"><div style={{width: `${seconds / WINDOW_S * 100}%`}}/></div>
         {codeError && <p className="form-error" role="alert">{codeError}</p>}
+        {localOnly && <p className="form-error" role="alert">Phones can’t open “localhost”, so this QR code won’t work on a phone. Open this page from the Vercel link (or a tunnel link), or set PUBLIC_SITE_URL on the server.</p>}
         {!password && checkedSaved
           ? <button className="text-link qr-link" onClick={() => { setAccessError(""); setAccessModal(true); }}>Enter club passcode <Icon name="arrow" size={16}/></button>
-          : claimUrl && <a href={claimUrl} target="_blank" rel="noreferrer" className="text-link qr-link">Open attendee screen <Icon name="arrow" size={16}/></a>}
-        {localOnly && <p className="form-error" role="alert">Phones can’t open “localhost”, so this QR code won’t work on a phone. Open this page from the Vercel link (or a tunnel link), or set PUBLIC_SITE_URL on the server.</p>}
-        <small className="qr-disclaimer">Each code works for up to a minute, then scan again.</small>
-      </div>
-      <aside className="roster-panel" aria-label="Who’s here"><div className="roster-head"><h2>Who’s here</h2>{roster && <span className="roster-count" aria-live="polite">{roster.length}</span>}</div>
+          : claimUrl && <a href={claimUrl} target="_blank" rel="noreferrer" className="text-link qr-link">Open the attendee screen <Icon name="arrow" size={16}/></a>}
+      </section>
+      <aside className="ci-card ci-roster roster-panel" aria-label="Who’s here">
+        <div className={`ci-count${countBump ? " count-bump" : ""}`} aria-live="polite"><strong>{attendees ?? "–"}</strong><span>{attendees === 1 ? "person showed up" : "people showed up"}</span></div>
+        <div className="roster-head"><h2>Who’s here</h2>{roster && <span className="roster-count">{roster.length}</span>}</div>
         <div className="roster-body">{roster === null
           ? <p className="roster-empty">{!checkedSaved || password ? "Loading names…" : "Enter the club passcode to see who’s here."}</p>
           : roster.length === 0
             ? <div className="roster-empty"><Icon name="people" size={22}/><p>Names show up here as people check in.</p></div>
             : <ol className="roster-list">{roster.map((a) => <li key={a.wallet} className={revocable ? "has-revoke" : undefined}>{a.name}{revocable && <button type="button" className="text-link revoke-button" disabled={revoking !== null} onClick={() => revoke(a)}>{revoking === a.wallet ? "Revoking…" : "Revoke"}</button>}</li>)}</ol>}</div>
         {revokeError && <p className="form-error revoke-error" role="alert">{revokeError}</p>}
-        {streamedCount > 0 && roster && <small className="qr-disclaimer" style={{margin: "10px 0 12px", padding: "0 24px", textAlign: "center"}}>{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
-      </aside></div>
-    <div className="token-details"><Icon name="shield" size={17}/><span>Event token<small>{event.name} · Token-2022 · Nontransferable · 0 decimals</small></span><a className="pill-link" href={explorerLink(event.mint)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div>
+        {streamedCount > 0 && roster && <small className="ci-stream">{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
+      </aside>
+    </div>
   </main><SiteFooter />
   {presenting && <div className={`present${urgency ? " " + urgency : ""}`} role="dialog" aria-modal="true" aria-label={`Check-in for ${event.name}, full screen`}>
     <button type="button" className="present-exit" onClick={() => setPresenting(false)}>Exit <kbd>Esc</kbd></button>
