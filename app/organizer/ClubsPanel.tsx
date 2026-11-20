@@ -32,6 +32,22 @@ export function ClubsPanel({ adminPassword }: { adminPassword: string }) {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // The organizer wallet pays every fee for every club. Its address is the default club's issuer.
+  const organizer = clubs?.find((c) => c.id === LEGACY_CLUB_ID)?.issuer ?? null;
+  const [sol, setSol] = useState<number | null>(null);
+  useEffect(() => {
+    if (!organizer) return;
+    fetch(`/api/balance/${organizer}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { sol?: number } | null) => setSol(typeof d?.sol === "number" ? d.sol : null))
+      .catch(() => {});
+  }, [organizer]);
+  // About 0.003 SOL per new event and 0.002 SOL per new attendee (see CLAUDE.md).
+  const low = sol !== null && sol < 0.05;
+  // Clubs waiting for the admin come first.
+  const sorted = clubs ? [...clubs].sort((a, b) => Number(a.verified) - Number(b.verified)) : null;
+  const waiting = clubs?.filter((c) => !c.verified).length ?? 0;
+
   useEffect(() => {
     const close = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) setModal(false); };
     window.addEventListener("keydown", close);
@@ -93,10 +109,16 @@ export function ClubsPanel({ adminPassword }: { adminPassword: string }) {
 
   return <>
     <div className="section-heading clubs-heading"><div><span className="eyebrow">REGISTRY ADMIN</span><h2>Clubs</h2></div><button className="button secondary" onClick={() => { setError(""); setModal(true); }}><Icon name="plus" size={17}/> Add a club</button></div>
+    {organizer && <div className={`club-wallet${low ? " is-low" : ""}`}>
+      <Icon name="shield" size={18}/>
+      <div><strong>Organizer wallet: {sol === null ? "…" : `${sol.toFixed(3)} SOL`}</strong><span>{low ? "Running low. Fund it at faucet.solana.com before the next event: " : "Pays every fee for every club: about 0.003 SOL per event and 0.002 SOL per new attendee. "}<a href={explorerLink(organizer)} target="_blank" rel="noreferrer">{organizer.slice(0, 4)}…{organizer.slice(-4)}</a></span></div>
+      {low && <a className="button primary" href="https://faucet.solana.com" target="_blank" rel="noreferrer">Open the faucet</a>}
+    </div>}
+    {waiting > 0 && <p className="club-waiting"><b>{waiting}</b> {waiting === 1 ? "club is" : "clubs are"} waiting for verification. Verify only clubs you know are real: their badges then count on track records, and they can spend the organizer wallet’s SOL.</p>}
     <div className="panel event-list">
       {clubs === null && <div className="event-row"><div className="event-info"><h3>Loading clubs…</h3></div></div>}
       {clubs?.length === 0 && <div className="event-row"><div className="event-info"><h3>Couldn’t load clubs.</h3><p>Refresh the page to try again.</p></div></div>}
-      {clubs?.map((c) => <div className="event-row club-row" key={c.id}><span className="history-check"><Icon name={c.verified ? "shield" : "people"} size={17}/></span><div className="event-info"><h3>{c.name}</h3><p>{c.verified ? "Verified issuer · badges from this club count" : "Not verified · badges from this club aren’t counted yet"}</p></div>{c.issuer && <a className="pill-link" href={explorerLink(c.issuer)} target="_blank" rel="noreferrer">Issuer wallet <Icon name="external" size={14}/></a>}{c.id !== LEGACY_CLUB_ID && <button className="button secondary" disabled={rowBusy === c.id} onClick={() => setClubVerified(c, !c.verified)}>{rowBusy === c.id ? "Saving…" : c.verified ? "Remove verification" : "Verify"}</button>}</div>)}
+      {sorted?.map((c) => <div className={`event-row club-row${c.verified ? "" : " is-waiting"}`} key={c.id}><span className="history-check"><Icon name={c.verified ? "shield" : "people"} size={17}/></span><div className="event-info"><h3>{c.name}</h3><p>{c.verified ? "Verified issuer · badges from this club count" : "Not verified · badges from this club aren’t counted yet"}</p></div>{c.issuer && <a className="pill-link" href={explorerLink(c.issuer)} target="_blank" rel="noreferrer">Issuer wallet <Icon name="external" size={14}/></a>}{c.id !== LEGACY_CLUB_ID && <button className="button secondary" disabled={rowBusy === c.id} onClick={() => setClubVerified(c, !c.verified)}>{rowBusy === c.id ? "Saving…" : c.verified ? "Remove verification" : "Verify"}</button>}</div>)}
     </div>
     {rowError && <p className="form-error" role="alert">{rowError}</p>}
     {modal && <div className="modal-overlay" onClick={() => !busy && setModal(false)}><form role="dialog" aria-modal="true" aria-label="Add a club" className="modal" onClick={e => e.stopPropagation()} onSubmit={submit}><button type="button" className="modal-close" aria-label="Close" disabled={busy} onClick={() => setModal(false)}>×</button><span className="eyebrow">GROW THE REGISTRY</span><h2>Add a club.</h2><p>It gets its own wallet on Solana for issuing badges.</p><label className="field">Club name<input value={name} maxLength={CLUB_NAME_MAX} placeholder="e.g. Hack Club" onChange={e => setName(e.target.value)}/></label><label className="field">Club passcode<input type="password" autoComplete="new-password" value={passcode} maxLength={100} placeholder={`At least ${PASSCODE_MIN} characters`} onChange={e => setPasscode(e.target.value)}/></label><label className="check-field"><input type="checkbox" checked={verified} onChange={e => setVerified(e.target.checked)}/> Verified: this is a real club, and its badges count</label><button type="submit" className="button primary full" disabled={busy}>{busy ? "Adding club…" : "Add club"} <Icon name="arrow" size={16}/></button>{error && <p className="form-error" role="alert">{error}</p>}<small>Share the passcode with that club’s officers. It can’t be shown again: only a scrambled copy is stored.</small></form></div>}

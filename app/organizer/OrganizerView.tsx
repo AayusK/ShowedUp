@@ -95,6 +95,16 @@ export default function OrganizerView() {
     }).catch(() => setSession(saved)).finally(() => setSessionChecked(true));
   }, []);
 
+  // Registry admin: how many clubs wait for verification (a dot on the Clubs tab).
+  const [waitingClubs, setWaitingClubs] = useState(0);
+  useEffect(() => {
+    if (!admin) { setWaitingClubs(0); return; }
+    fetch("/api/clubs", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { clubs?: { verified: boolean }[] } | null) => setWaitingClubs((d?.clubs ?? []).filter((c) => !c.verified).length))
+      .catch(() => {});
+  }, [admin]);
+
   // Which part of the dashboard is open: the club's events, its openings, or (registry admin
   // only) the list of clubs.
   const [tab, setTab] = useState<"overview" | "events" | "badges" | "members" | "openings" | "activity" | "clubs">("overview");
@@ -318,7 +328,7 @@ export default function OrganizerView() {
       <button type="button" className={tab === "members" ? "on" : ""} onClick={() => setTab("members")} disabled={!session} aria-current={tab === "members" ? "page" : undefined}><Icon name="people" size={19}/><span>Members</span></button>
       <button type="button" className={tab === "openings" ? "on" : ""} onClick={() => setTab("openings")} disabled={!session} aria-current={tab === "openings" ? "page" : undefined}><Icon name="door" size={19}/><span>Openings</span>{pending > 0 && <i className="dash-dot" aria-label={`${pending} to decide`}/>}</button>
       <button type="button" className={tab === "activity" ? "on" : ""} onClick={() => setTab("activity")} disabled={!session} aria-current={tab === "activity" ? "page" : undefined}><Icon name="pulse" size={19}/><span>Activity</span></button>
-      {admin && <button type="button" className={tab === "clubs" ? "on" : ""} onClick={() => setTab("clubs")} aria-current={tab === "clubs" ? "page" : undefined}><Icon name="shield" size={19}/><span>Clubs</span></button>}
+      {admin && <button type="button" className={tab === "clubs" ? "on" : ""} onClick={() => setTab("clubs")} aria-current={tab === "clubs" ? "page" : undefined}><Icon name="shield" size={19}/><span>Clubs</span>{waitingClubs > 0 && <i className="dash-dot" aria-label={`${waitingClubs} waiting for verification`}/>}</button>}
       <span className="dash-rail-end" title={session ? `${clubName} · signed in` : "Not signed in"}>{session ? initials : "?"}</span>
     </nav>
     <div className="dash-main">
