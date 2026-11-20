@@ -17,6 +17,7 @@ import { LEGACY_CLUB_ID, LEGACY_CLUB_NAME, type ClubInfo } from "@/lib/clubs";
 import { ClubsPanel } from "./ClubsPanel";
 import { AwardModal, type AwardTarget } from "./AwardModal";
 import { OpeningsPanel } from "./OpeningsPanel";
+import { ChatPanel } from "@/components/ChatPanel";
 
 interface EventItem {
   id: string;
@@ -107,7 +108,17 @@ export default function OrganizerView() {
 
   // Which part of the dashboard is open: the club's events, its openings, or (registry admin
   // only) the list of clubs.
-  const [tab, setTab] = useState<"overview" | "events" | "badges" | "members" | "openings" | "activity" | "clubs">("overview");
+  const [tab, setTab] = useState<"overview" | "events" | "badges" | "members" | "openings" | "activity" | "chat" | "clubs">("overview");
+
+  // Chat: the name officers show in messages (e.g. "Priya, President"), remembered in this browser.
+  const [chatName, setChatName] = useState("");
+  useEffect(() => { try { setChatName(localStorage.getItem("showedup-chat-name") ?? ""); } catch {} }, []);
+  const saveChatName = (v: string) => { setChatName(v); try { localStorage.setItem("showedup-chat-name", v); } catch {} };
+  const loadClubMembers = useCallback(async () => {
+    if (!session) return [];
+    const r = await fetch(`/api/clubs/${session.clubId}/members`, { headers: clubHeaders(session), cache: "no-store" });
+    return r.ok ? ((await r.json()).members ?? []) : [];
+  }, [session]);
 
   // Members tab: everyone holding one of this club's badges, most active first.
   type RosterEntry = { wallet: string; name: string; attended: number; roles: Record<string, number> };
@@ -328,6 +339,7 @@ export default function OrganizerView() {
       <button type="button" className={tab === "members" ? "on" : ""} onClick={() => setTab("members")} disabled={!session} aria-current={tab === "members" ? "page" : undefined}><Icon name="people" size={19}/><span>Members</span></button>
       <button type="button" className={tab === "openings" ? "on" : ""} onClick={() => setTab("openings")} disabled={!session} aria-current={tab === "openings" ? "page" : undefined}><Icon name="door" size={19}/><span>Openings</span>{pending > 0 && <i className="dash-dot" aria-label={`${pending} to decide`}/>}</button>
       <button type="button" className={tab === "activity" ? "on" : ""} onClick={() => setTab("activity")} disabled={!session} aria-current={tab === "activity" ? "page" : undefined}><Icon name="pulse" size={19}/><span>Activity</span></button>
+      <button type="button" className={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")} disabled={!session} aria-current={tab === "chat" ? "page" : undefined}><Icon name="chat" size={19}/><span>Chat</span></button>
       {admin && <button type="button" className={tab === "clubs" ? "on" : ""} onClick={() => setTab("clubs")} aria-current={tab === "clubs" ? "page" : undefined}><Icon name="shield" size={19}/><span>Clubs</span>{waitingClubs > 0 && <i className="dash-dot" aria-label={`${waitingClubs} waiting for verification`}/>}</button>}
       <span className="dash-rail-end" title={session ? `${clubName} · signed in` : "Not signed in"}>{session ? initials : "?"}</span>
     </nav>
@@ -466,6 +478,11 @@ export default function OrganizerView() {
               <span className="dash-name"><strong>{item.role ?? "Checked in"}</strong><span className="dash-sub">{item.eventName} · <code>{item.wallet}</code></span></span>
               <a className="dash-open" href={explorerLink(item.signature, "tx")} target="_blank" rel="noreferrer">{activity ? timeAgo(item.at, activity.now) : ""} <Icon name="external" size={13}/></a>
             </li>)}</ul>}
+      </>}
+
+      {session && tab === "chat" && <>
+        <label className="chat-name-field">Your name in chat<input value={chatName} maxLength={40} placeholder="e.g. Priya, President" onChange={(e) => saveChatName(e.target.value)}/></label>
+        <ChatPanel clubId={session.clubId} officer headers={{ ...clubHeaders(session), ...(chatName.trim() ? { "x-chat-name": encodeURIComponent(chatName.trim()) } : {}) }} loadMembers={loadClubMembers}/>
       </>}
 
       {session && tab === "openings" && <OpeningsPanel session={session} club={club} />}

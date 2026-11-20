@@ -285,6 +285,12 @@ Possible next work (ask before starting any of it):
   (`POST /api/clubs` without the admin password). It always starts unverified and can't create
   events, award badges or add attendance (`club_not_verified`) until the registry admin verifies
   it, so strangers can't spend the organizer wallet's SOL. Sign-ups pause at 50 pending clubs.
+- **Club chat (Nov 20, owner's OK):** officers chat with the club passcode (optional display label
+  via `x-chat-name`); members sign in once with a wallet signature at `/chat/[clubId]` and get a
+  7-day HMAC token (key = `"chat:" + EVENT_SECRET`, nothing stored), only if `clubMembers` lists
+  them. Every club has an "Everyone" group; only officers create, change or archive groups.
+  Members see names of people in their groups. Tables in `db/07_chat.sql`; routes under
+  `/api/chat/[clubId]`; UI in `components/ChatPanel.tsx`. Messages refresh by polling (4 s).
 - **Public profiles (Nov 20, owner's OK):** opt-in. A student's name, headline, school, bio, links
   (LinkedIn shown as a button) and skills show on their track record only after they switch it
   on. Stored in `profiles` (`db/06_profiles.sql`, RLS on, no policies); saving and reading a hidden

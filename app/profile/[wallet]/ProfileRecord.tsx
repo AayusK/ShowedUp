@@ -148,6 +148,7 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
                 <strong>{club.name}</strong>
                 <span>{roleCounts(terms.flatMap((t) => t.events)).join(" · ")}</span>
               </div>
+              {isMine && <Link className="rec-chat" href={`/chat/${club.id}`}><Icon name="chat" size={13} /> Club chat</Link>}
               <a href={explorerLink(club.issuer)} target="_blank" rel="noreferrer" aria-label={`View ${club.name}’s issuer wallet on Solana Explorer`}>Issuer <Icon name="external" size={12} /></a>
             </div>
             {terms.map((term) => (
