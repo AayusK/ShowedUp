@@ -71,7 +71,8 @@ secret key can read or write them.
 | `/openings/[id]` | `app/openings/[id]/OpeningView.tsx` | Opening with a rule: check, apply with a wallet signature |
 
 Track-record routes (`app/api/`): `GET/POST clubs`, `PATCH clubs/[id]` (admin, verify), `POST events/[id]/award`,
-`POST events/[id]/revoke` (club passcode; burns as permanent delegate), `GET/POST openings`,
+`POST events/[id]/revoke` (club passcode; burns as permanent delegate), `POST events/[id]/attendance`
+(club passcode; adds someone who missed the scan, marks `claims.added_by_officer`), `GET/POST openings`,
 `openings/[id]/{check,apply,applications}`, `GET feed` (live feed across clubs, no names).
 
 API routes (`app/api/`): `GET/POST events` (`?counts=1` adds attendee counts from mint supply),
@@ -168,6 +169,9 @@ Another optional variable: `PRIVY_APP_ID` turns on email / Google sign-in. It is
 design (not a secret); `app/layout.tsx` reads it on the server and passes it down, so it still
 isn't `NEXT_PUBLIC_*`. The server doesn't use `PRIVY_APP_SECRET`.
 
+Optional and not a secret: `PUBLIC_SITE_URL` (e.g. `https://showedup-phi.vercel.app`). When set,
+check-in QR codes always point there, even if the organizer page was opened at localhost.
+
 **This repo's own test setup (`AayusK/ShowedUp`, since Nov 16):** `.env.local` on Aayus's Mac
 points at a separate Supabase project "ShowedUp" (ref `vrzcdxhjmdceaheuynpi`, organization
 "Impact Developers", same three tables, RLS on, no policies) and a separate organizer wallet
@@ -228,6 +232,16 @@ and seed-derived badge addresses; Step 2 role badges and "Award contribution"; S
 record page by club and term; Step 4 openings with a rule; Wave B: revocation (permanent delegate
 burn + `claims.revoked_at`), `npm run fake-badge`, and the live feed across clubs (`/api/feed`).
 Schema: `db/01_clubs.sql` … `db/04_revocation.sql`, each safe to run twice.
+
+**Demo redesign (Nov 18–20, branch `claude/pensive-ritchie-gk73lm`, draft PR #5):** compact
+redesign of every page (frosted top bar with Club / Track record tabs; club dashboard with a
+glossy side rail, Events / Openings / Clubs tabs and a ··· menu per event; check-in page with QR
+and who's-here cards; one-page track record; shorter home page; restyled claim, verify,
+openings and pop-ups). Fixes: claim continues after connecting, no "connect" flash on
+`/profile/me`, tier progress bar, QR uses `PUBLIC_SITE_URL` (optional, not secret) and warns on
+localhost, creating an event opens its QR. New feature: officers add someone who missed the scan
+(`db/05_manual_attendance.sql`; officer-added wallets never count as members, so a pasted
+stranger's name stays hidden). Team-lead logins were planned but held until after the demo.
 
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's
 constraints, progress log) is in [`docs/UI-AUDIT.md`](docs/UI-AUDIT.md). Read it before any UI
