@@ -61,8 +61,8 @@ secret key can read or write them.
 
 | Route | File | What it does |
 |---|---|---|
-| `/` | `app/page.tsx` → `app/HomeView.tsx` | Hero + the 3 most recent real events |
-| `/organizer` | `app/organizer/OrganizerView.tsx` | Password prompt, create event, event list with on-chain attendee counts |
+| `/` | `app/page.tsx` → `app/HomeView.tsx` | Short hero with a track record preview, live feed across clubs, open openings, "checking in today" banner |
+| `/organizer` | `app/organizer/OrganizerView.tsx` | Club dashboard behind the passcode: side rail with Overview, Events, Badges, Members, Openings, Activity, Clubs (admin) |
 | `/organizer/[id]` | `app/organizer/[id]/CheckinView.tsx` | Rotating QR (Phantom browse link), 30 s countdown, live "N people showed up", "Who’s here" names list |
 | `/claim/[eventId]?c=` | `app/claim/[eventId]/ClaimView.tsx` | Name (first claim per wallet) + sign message → claim; ready / success / already claimed / expired screens |
 | `/profile/[wallet]` | `app/profile/[wallet]/ProfileView.tsx` | On-chain attendance + tier; `me`/`demo` = connected wallet |
@@ -73,7 +73,9 @@ secret key can read or write them.
 Track-record routes (`app/api/`): `GET/POST clubs`, `PATCH clubs/[id]` (admin, verify), `POST events/[id]/award`,
 `POST events/[id]/revoke` (club passcode; burns as permanent delegate), `POST events/[id]/attendance`
 (club passcode; adds someone who missed the scan, marks `claims.added_by_officer`), `GET/POST openings`,
-`openings/[id]/{check,apply,applications}`, `GET feed` (live feed across clubs, no names).
+`openings/[id]/{check,apply,applications}`, `GET feed` (live feed across clubs, no names),
+`GET clubs/[id]/roster` (club passcode; read-only: everyone holding a club badge, events attended
+and role badges, names only for self-check-ins; powers the dashboard's Members and Overview tabs).
 
 API routes (`app/api/`): `GET/POST events` (`?counts=1` adds attendee counts from mint supply),
 `GET events/[id]/code` (password), `GET events/[id]/attendees` (password; names), `POST claim` (saves the name),
@@ -241,7 +243,10 @@ openings and pop-ups). Fixes: claim continues after connecting, no "connect" fla
 `/profile/me`, tier progress bar, QR uses `PUBLIC_SITE_URL` (optional, not secret) and warns on
 localhost, creating an event opens its QR. New feature: officers add someone who missed the scan
 (`db/05_manual_attendance.sql`; officer-added wallets never count as members, so a pasted
-stranger's name stays hidden). Team-lead logins were planned but held until after the demo.
+stranger's name stays hidden). Dashboard tabs: Overview (default: next event, term numbers, top
+members, latest activity), Events (with an attendance trend chart), Badges, Members, Openings,
+Activity (the club's slice of `/api/feed`), Clubs (registry admin). Team-lead logins were planned
+but held until after the demo (plan in the session notes, not in the repo).
 
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's
 constraints, progress log) is in [`docs/UI-AUDIT.md`](docs/UI-AUDIT.md). Read it before any UI
