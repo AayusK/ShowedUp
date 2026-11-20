@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { authorizeClub, ownsEvent } from "@/lib/server/auth";
 import { awardBadge } from "@/lib/server/awards";
-import { supportsOfficerAdds } from "@/lib/server/claimsDb";
+import { officerCheckIn, supportsOfficerAdds } from "@/lib/server/claimsDb";
 import { ClubKeyError } from "@/lib/server/clubs";
 import { getEvent } from "@/lib/server/events";
 import { OrganizerUnfundedError } from "@/lib/server/mint";
@@ -14,8 +14,8 @@ function error(code: string, status: number, extra: Record<string, unknown> = {}
 }
 
 // An officer adds someone who missed the QR scan to an event's attendance. Needs the passcode of
-// the club that owns the event. Mints the same attendance badge a scan would (organizer pays,
-// the club's key signs as issuer) and marks the claim as added by an officer.
+// the club that owns the event. Private events: a check-in row, nothing on-chain. Older events
+// with a token: mints the same badge a scan would. Either way the claim is marked officer-added.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -54,9 +54,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
-    // Without db/05_manual_attendance.sql the "added by officer" mark can't be saved, and the
+    // Without db/06_manual_attendance.sql the "added by officer" mark can't be saved, and the
     // person's saved name could show to this club. Refuse before anything is minted.
     if (!(await supportsOfficerAdds())) return error("schema_not_ready", 503);
+    // Private events (no token): the check-in is a database row, nothing is minted.
+    if (!event.mint) {
+      const done = await officerCheckIn(event.id, owner.toBase58());
+      return NextResponse.json(done === "success" ? { status: "awarded" } : { status: "already_awarded" });
+    }
     const result = await awardBadge(event, club, owner, { addedByOfficer: true });
     if (result.status === "in_progress") return error("in_progress", 409);
     return NextResponse.json(result);

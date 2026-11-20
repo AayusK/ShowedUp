@@ -1,87 +1,44 @@
 # ShowedUp
 
-Proof of attendance for student clubs, on **Solana devnet**.
+Student clubs use ShowedUp to check people in privately and give students verifiable records of their contributions. A club signs each contribution on Solana devnet. A student can download the record and share it with another club.
 
-**Live:** https://showedup-phi.vercel.app
+[Live app](https://showed-up.vercel.app) · [Product spec](SPEC.md)
 
-An organizer creates an event and a rotating QR code appears on the projector. Attendees scan it
-with their phone camera, it opens in Phantom, and they tap **Claim**. Each attendee gets one
-**soulbound** (non-transferable) token for that event. The organizer's wallet pays every fee, so
-attendees never need SOL. A profile page reads a wallet's tokens from the chain and shows a perk
-tier: 1 event = Showed Up, 3 = Regular, 5 = Core Member.
+## Deployment setup
 
-Product spec: [SPEC.md](SPEC.md). Notes for Claude Code: [CLAUDE.md](CLAUDE.md).
+1. Apply `db/01_clubs.sql`, `db/02_role_badges.sql`, `db/03_openings.sql`, `db/04_revocation.sql`, and `db/05_private_checkins.sql` in order in the target Supabase project. The last migration allows private events and creates the receipts table. Each migration can be run again.
+2. Apply `streams/chain_claims.sql` for legacy stream deliveries.
+3. Configure the server variables below in Vercel. Existing clubs need their original `CLUB_KEY_SECRET` and issuer addresses.
+4. Deploy the app. For the live feed, install the filter described under **Live claim feed**.
 
-**Now a track record across clubs.** Each club issues badges from its own Solana wallet: attendance
-by QR code, and role badges (Mentor, Speaker, Volunteer…) awarded by an officer. A student's
-track record groups them by club and term; a second club can post an opening with a rule and
-pick people from records it can check on Solana. Records are positive only, and no student's
-name is ever written on-chain.
+## Running an event
 
-## Before merging to `main` or deploying (one-time)
+1. Open **Organizer**, sign in to the club, select **Create event**, and enter its name and date.
+2. Open the event’s check-in screen. Attendees scan the rotating QR, sign in with email, Google or Phantom, and confirm their attendance. The first check-in asks for a name. Each wallet gets one entry on the event’s private roster.
+3. Choose **Confirm a contribution** on the event, or **Award contribution** on the organizer page. Select the event, role and checked-in attendees, describe their work, and confirm. Each student gets one receipt per event and role. A retry uses the saved approval.
+4. Students open **My track record → View my private check-ins and receipts**, approve the wallet message, and choose **Contributions → Download receipt**. They can share that JSON file with anyone they choose. The public profile link shows legacy token badges.
+5. For an opening, students sign to check eligibility. Applying shares matching contributions with the receiving club’s officers. Private check-ins count toward the student’s attendance tier.
 
-The track-record code needs these on the **live** setup first, or the new pages fail:
+### Verifying a receipt
 
-1. In the live Supabase project's SQL editor, run in order: `db/01_clubs.sql`,
-   `db/02_role_badges.sql`, `db/03_openings.sql`, `db/04_revocation.sql` (each is safe to run
-   twice and never drops anything). Also `streams/chain_claims.sql` if it isn't there yet.
-2. In Vercel → Settings → Environment Variables, set `CLUB_KEY_SECRET` (see Configuration). Set it
-   once and never change it.
-3. Redeploy.
+From this checkout, use the downloaded file and an issuer address obtained from the club. The verifier reads Solana devnet directly.
 
-## Running an event (organizers)
+```bash
+npm run receipt:verify -- student.receipt.json --issuer <trusted-club-address>
+```
 
-1. On the laptop that drives the projector, open https://showedup-phi.vercel.app/organizer.
-2. Click **Create event**, enter the organizer password, fill in name, date, time and (optional)
-   location. Creating the event takes a few seconds: it creates the event's token on Solana.
-3. Click **Open check-in** on the event. Put that page on the projector: it shows a QR code that
-   changes every 30 seconds and a live "N people showed up" count. Click **Present on a
-   projector** for a full-screen version with a much larger QR code (Esc to leave).
+A matching receipt prints `VALID`. Editing a field in the downloaded record after issuance produces `EDITED`. To issue a standalone test file using the local organizer wallet, run `npm run receipt:demo`.
 
-Attendees:
+## How records are stored
 
-1. Scan the QR with the phone's normal camera app.
-   - With sign-in on (`PRIVY_APP_ID` set): the claim page opens in the phone's browser. Tap
-     **Sign in to claim**, use email or Google, then **Claim attendance**. No app to install; a
-     Solana wallet is created for them behind the scenes. Phantom users can tap **Open in Phantom**.
-   - Without it: the claim page opens inside **Phantom** (or offers to install Phantom).
-2. Phantom users: tap **Connect wallet** → **Claim attendance** → approve the signature in
-   Phantom. Signing is free and sends nothing; it proves they own the wallet.
-3. They see "You showed up." with a link to the transaction. **My attendance** shows their events
-   and tier. Anyone can check a wallet at **My attendance → Verify a wallet**.
+| Action | Supabase | Solana devnet |
+|---|---|---|
+| Create an event or check in | Event with an empty mint address and one confirmed row per event and wallet | No transaction |
+| Confirm a contribution | Approved record, salt and signed transaction saved before broadcast. The confirmed file remains downloadable. | Club-signed Memo v2 instruction containing `showedup:v1:<salted SHA-256 hash>`. The organizer pays the fee. |
+| Verify or apply | A signed wallet read unlocks private files. Applying shares the matching proofs with the receiving club. | The verifier checks the memo and the club’s signature. |
+| Use a legacy badge | Existing mint address and claim data | Token-2022 issuance, ownership checks and supported burns still apply. |
 
-Tokens live on devnet, so they only appear inside Phantom when it's set to devnet
-(Settings → Developer Settings → Testnet Mode → Solana Devnet). Claiming and the profile page
-work either way.
-
-## How it works
-
-| On-chain (Solana devnet) | Server (Next.js on Vercel) + database (Supabase) |
-|---|---|
-| One Token-2022 mint per event: 0 decimals, **NonTransferable** extension, organizer is mint authority. New events also use the **Metadata** extension: the event name, `date` and `location` are stored in the mint itself. | `events` table: `id, name, starts_at, location, mint` |
-| A claim creates the attendee's token account (if needed) and mints 1 token. The organizer pays. | `claims` table: one row per (event, wallet). Its primary key is the lock that stops double claims across server instances. |
-| Attendance = holding a token from an event's mint. Profiles and attendee counts are read from the chain: a profile lists every token the wallet holds that the organizer wallet issued, using the name and date stored in the token. The database is only needed for older events without those details. | Rotating claim code: `HMAC(EVENT_SECRET, eventId:30s-window)`, 6 characters; the current and previous windows are accepted. Claims require the wallet to sign `ShowedUp claim:<eventId>:<code>:<wallet>`. |
-
-The browser never talks to Solana or Supabase directly. Every secret stays on the server.
-
-API: `GET/POST /api/clubs` (admin), `GET/POST /api/events`, `GET /api/events/[id]/code`,
-`GET /api/events/[id]/attendees`, `POST /api/events/[id]/award`, `POST /api/events/[id]/revoke`,
-`POST /api/claim`, `GET /api/profile/[wallet]`, `GET/POST /api/openings`, `/api/openings/[id]/{check,apply,applications}`,
-`GET /api/feed`, `GET /api/balance/[wallet]`, `POST /api/organizer/verify`.
-
-### Taking back a badge
-
-Officers see a **Revoke** button on the check-in "Who's here" list and on a role badge's
-recipients page. It burns the student's token: every badge made since clubs existed names its
-club as the token's *permanent delegate* (an address Solana lets remove that token from any
-holder). The organizer pays the fee and `claims.revoked_at` records it. Badges from before clubs
-existed can't be taken back, so the button doesn't show for them.
-
-### Live across clubs
-
-The home page shows the newest badges from every verified club, as the QuickNode Stream saw them
-on Solana: role, club, event, a shortened wallet and the time, never a name. It refreshes every
-15 seconds and shows a quiet "resting" line when the stream is off.
+Attendance tiers are Showed Up at one event, Regular at three and Core Member at five. Receipt revocation is deferred.
 
 ## Configuration
 
@@ -90,11 +47,11 @@ Variables**; locally they're in `.env.local` (never commit it). See `.env.exampl
 
 | Variable | What it's for |
 |---|---|
-| `ORGANIZER_SECRET_KEY` | The organizer wallet's secret key (base58 or JSON array). Pays all fees, mints every token. |
+| `ORGANIZER_SECRET_KEY` | The organizer wallet's secret key (base58 or JSON array). Pays receipt and legacy token fees. Signs for the default club. |
 | `EVENT_SECRET` | Any long random string. Signs the rotating QR codes. |
 | `ORGANIZER_PASSWORD` | Password of the registry admin, who creates and verifies clubs. Also the default club's passcode (creating events, showing QR codes). |
 | `CLUB_KEY_SECRET` | Any long random string (32+ characters). Every other club's Solana wallet is worked out from it and the club's id, so no club key is stored anywhere. Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. **Never change it once clubs exist:** every club would get a new wallet and the badges they already issued would stop counting. |
-| `RPC_URL` | Devnet RPC. Use a free [Helius](https://helius.dev) **devnet** URL; the public endpoint rate-limits. |
+| `RPC_URL` | Devnet RPC. Use a free [Helius](https://helius.dev) **devnet** URL; the public endpoint rate-limits. The server checks the cluster identity and falls back to the public devnet endpoint if needed. |
 | `SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_SECRET_KEY` | Supabase secret key (`sb_secret_…`, Project Settings → API Keys). |
 | `PRIVY_APP_ID` (optional) | [Privy](https://dashboard.privy.io) app ID. Lets attendees sign in with email or Google instead of Phantom; a Solana wallet is created for them. Not a secret. Leave empty for Phantom-only. |
@@ -106,10 +63,7 @@ After changing a variable in Vercel, redeploy (Deployments → ⋯ → Redeploy)
 
 ### Live claim feed (QuickNode Streams)
 
-A [QuickNode Stream](https://www.quicknode.com/streams) watches every new Solana devnet block
-and tells ShowedUp the moment the organizer wallet hands someone an attendance token. The app
-stores those claims in the `chain_claims` table, so it learns about attendance from the chain
-as it happens instead of asking Solana over and over.
+The stream recognizes club-signed receipt memos and legacy token claims in devnet blocks. Receipt activity on the home page shows the club, time and transaction. The receipt record and student wallet stay private.
 
 One-time setup:
 
@@ -123,24 +77,14 @@ One-time setup:
 4. **Token:** set `QUICKNODE_STREAM_TOKEN` to that token in Vercel (and `.env.local`), then
    redeploy.
 
-What you see: on the check-in page, the "Who's here" list includes everyone the stream has
-reported, plus anyone only the app has recorded so far, and a line under it says how many were
-seen live on Solana. Tokens handed out outside the web app (for example by `npm run seed`) show
-up too. If the stream is paused, the list keeps working from the app's own record.
-
-How it stays safe: QuickNode signs every delivery with the token (HMAC-SHA256), and the endpoint
-rejects anything unsigned. It only stores claims for tokens that belong to one of our events,
-and receiving the same delivery twice changes nothing.
+The webhook authenticates each delivery and matches receipt observations to a saved transaction signature and memo hash. Repeated deliveries update one receipt. If a delivery arrives before local confirmation finishes, the server checks the transaction on devnet before releasing the file. Check-ins work while the stream is paused.
 
 QuickNode charges credits for every block the stream reads, whether or not it contains a claim.
 On a free plan, pause the stream when you're not running an event or a demo.
 
 ### Keeping the organizer wallet funded
 
-Every new event costs about 0.003 devnet SOL and every new attendee about 0.002, paid by the
-organizer wallet. When it runs low the app says "The organizer wallet needs devnet SOL". Fund the
-organizer address at https://faucet.solana.com (select **Devnet**). 1 SOL covers hundreds of
-attendees.
+Creating a private event and checking in consume zero SOL. The organizer pays the transaction fee when a club confirms a contribution. Use the devnet faucet when the app reports an unfunded organizer. [Solana faucet](https://faucet.solana.com)
 
 ## Local development
 
@@ -180,10 +124,7 @@ create locally appear on the live site too.
 
 ### Deploying
 
-Vercel deploys automatically on every push to `main` of the repo the Vercel project is linked
-to. The project is on Ojas's account (`ojas-deshmukhs-projects`); check which repo it's linked to
-before relying on this. To check a deploy, open the project's
-**Deployments** tab on vercel.com.
+This repository deploys through the Vercel project `aayusks-projects/showed-up`. Check the deployment status on the GitHub commit or in Vercel. [Project deployments](https://vercel.com/aayusks-projects/showed-up/deployments)
 
 ### Testing on a phone without deploying
 
@@ -200,7 +141,7 @@ testing only. Install once with `winget install --id Cloudflare.cloudflared`.
 
 ## Limits and known trade-offs
 
-- **Devnet only.** Tokens have no real value, and Solana could reset devnet.
+- **Devnet only.** Independent verification requires the receipt transaction to remain available from a devnet RPC.
 - **Codes can be shared for up to about 60 seconds.** A screenshot of the QR works until two
   30-second windows pass. Good enough for a club meeting; a stricter version could shorten the
   window or check location.

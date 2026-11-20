@@ -2,8 +2,8 @@ import "server-only";
 import { db } from "./db";
 
 // A claim row is a lock that works across every server instance: the (event_id, wallet)
-// primary key means only one request can hold it. The blockchain remains the source of truth
-// for attendance; this just stops two requests from minting at the same time.
+// primary key means only one request can hold it. For private events the confirmed row is the
+// check-in itself. Legacy events still use a reservation while their token is being minted.
 
 const STALE_MS = 2 * 60_000; // a "pending" row older than this is from a request that died
 
@@ -11,7 +11,7 @@ export type Reservation = "reserved" | "confirmed" | "in_progress";
 
 export async function reserveClaim(eventId: string, wallet: string, opts: { addedByOfficer?: boolean } = {}): Promise<Reservation> {
   // An officer adding someone by hand marks the row before anything is minted, so the mark is
-  // never missing on a minted badge (see db/05_manual_attendance.sql).
+  // never missing on a minted badge (see db/06_manual_attendance.sql).
   const row = { event_id: eventId, wallet, status: "pending", ...(opts.addedByOfficer ? { added_by_officer: true } : {}) };
   const { error } = await db().from("claims").insert(row);
   if (!error) return "reserved";
@@ -38,6 +38,25 @@ export async function confirmClaim(eventId: string, wallet: string, signature: s
     .update({ status: "confirmed", signature, updated_at: new Date().toISOString() })
     .eq("event_id", eventId).eq("wallet", wallet);
   if (error) console.error("[claims] confirm failed:", error.message); // token is minted either way
+}
+
+/** Single committed insert: parallel scans get one check-in and no Solana transaction. */
+export async function checkIn(eventId: string, wallet: string): Promise<"success" | "already_claimed"> {
+  const { error } = await db().from("claims").insert({ event_id: eventId, wallet, status: "confirmed" });
+  if (!error) return "success";
+  if (error.code === "23505") return "already_claimed";
+  throw new Error(`check-in failed: ${error.message}`);
+}
+
+/**
+ * An officer adds someone who missed the scan to a private event: the same single insert as a
+ * check-in, flagged as added by an officer (db/06_manual_attendance.sql). Nothing goes on-chain.
+ */
+export async function officerCheckIn(eventId: string, wallet: string): Promise<"success" | "already_claimed"> {
+  const { error } = await db().from("claims").insert({ event_id: eventId, wallet, status: "confirmed", added_by_officer: true });
+  if (!error) return "success";
+  if (error.code === "23505") return "already_claimed";
+  throw new Error(`officer check-in failed: ${error.message}`);
 }
 
 /** Mark an already-held token as confirmed (e.g. claims from before the database existed). */
@@ -76,7 +95,7 @@ export async function markRevoked(eventId: string, wallet: string, addIfMissing 
   if (insertErr && insertErr.code !== "23505") console.error("[claims] revoke note failed:", insertErr.message.split("\n")[0]);
 }
 
-/** False until db/05_manual_attendance.sql has been run (no `added_by_officer` column yet). */
+/** False until db/06_manual_attendance.sql has been run (no `added_by_officer` column yet). */
 export async function supportsOfficerAdds(): Promise<boolean> {
   const { error } = await db().from("claims").select("added_by_officer").limit(1);
   if (error && MISSING_COLUMN.has(error.code ?? "")) return false;

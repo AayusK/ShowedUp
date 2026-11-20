@@ -74,7 +74,7 @@ export function ProfileCardEditor({ wallet, initial, onClose, onSaved }: { walle
       const signature = await sign(cardReadMessage(wallet, signedAt));
       const res = await fetch(`/api/profile-card/${wallet}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "read", signedAt, signature }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(data.error === "schema_not_ready" ? "Profiles aren’t set up yet: run db/06_profiles.sql in Supabase." : "Couldn’t load your saved profile."); return; }
+      if (!res.ok) { setError(data.error === "schema_not_ready" ? "Profiles aren’t set up yet: run db/07_profiles.sql in Supabase." : "Couldn’t load your saved profile."); return; }
       const c = data.card as ProfileCard;
       setCard(c); setLinkedin(c.links.find(isLinkedIn) ?? ""); setOthers(c.links.filter((l) => !isLinkedIn(l)).concat(["", ""]).slice(0, 2)); setSkills(c.skills.join(", "));
     } catch { setError("Signature cancelled."); } finally { setBusy(null); }
@@ -93,7 +93,7 @@ export function ProfileCardEditor({ wallet, initial, onClose, onSaved }: { walle
       const res = await fetch(`/api/profile-card/${wallet}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "save", card: cleaned.card, signedAt, signature }) });
       const data = await res.json().catch(() => ({}));
       if (res.ok) { onSaved(data.card as ProfileCard); return; }
-      setError(data.error === "schema_not_ready" ? "Profiles aren’t set up yet: run db/06_profiles.sql in Supabase."
+      setError(data.error === "schema_not_ready" ? "Profiles aren’t set up yet: run db/07_profiles.sql in Supabase."
         : data.error === "invalid_input" ? (data.message ?? "Check the fields and try again.")
         : data.error === "bad_signature" ? "The signature didn’t match this wallet. Try again." : "Couldn’t save right now. Try again.");
     } catch { setError("Signature cancelled. Nothing was saved."); } finally { setBusy(null); }

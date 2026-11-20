@@ -38,6 +38,8 @@ Other rules:
 
 ---
 
+**Current receipt workflow.** See the **Running an event** section in `README.md` and the current `SPEC.md`. New attendance uses private database rows. Officers issue one receipt per checked-in student, event and role. The token details in the early build history apply to legacy events.
+
 ## 2. What this is
 
 **ShowedUp**: proof of attendance for our student club on **Solana devnet**. It started as a
@@ -45,19 +47,18 @@ practice hackathon project (UBC 2026 prep, Consumer Apps track) and is now in re
 
 - An **organizer** creates an event, and a rotating QR code shows up on their laptop/projector.
 - An **attendee** scans it with their phone camera; it opens in Phantom, they connect and tap **Claim**.
-- The attendee gets 1 **soulbound** (non-transferable) token for that event. The organizer's
-  key pays every fee, so attendees never need SOL.
-- A **profile page** reads the wallet's tokens from the blockchain and shows a perk tier:
+- The app saves a private check-in. An officer can later confirm the attendee’s contribution.
+  The organizer pays the devnet fee for that receipt.
+- A student unlocks their **profile** to see check-ins, downloadable receipts, and legacy tokens. Verified attendance earns perk tiers:
   1 event = Showed Up, 3 = Regular, 5 = Core Member.
 
 Full details: `SPEC.md`. Setup and operations: `README.md`.
 
 ## 3. Current state: live and real
 
-**Live:** https://showedup-phi.vercel.app (Vercel, auto-deploys every push to `main`).
-**Database:** Supabase project "ShowedUp" (ref `gcgvglojxgaxycbxdach`) in the **CryptoClub**
-organization. Tables `events`, `claims` and `members` (wallet → display name, asked once per wallet), RLS on with **no public policies**: only the server's
-secret key can read or write them.
+**Live app** [showed-up.vercel.app](https://showed-up.vercel.app). Vercel builds this repository’s `main` branch.
+
+**Database** Supabase project `enzijcqcmlzeyhbizmov` stores events, check-ins, receipts, clubs, members and openings. The server uses the Supabase secret key.
 
 | Route | File | What it does |
 |---|---|---|
@@ -65,7 +66,7 @@ secret key can read or write them.
 | `/organizer` | `app/organizer/OrganizerView.tsx` | Club dashboard behind the passcode: side rail with Overview, Events, Badges, Members, Openings, Activity, Clubs (admin) |
 | `/organizer/[id]` | `app/organizer/[id]/CheckinView.tsx` | Rotating QR (Phantom browse link), 30 s countdown, live "N people showed up", "Who’s here" names list |
 | `/claim/[eventId]?c=` | `app/claim/[eventId]/ClaimView.tsx` | Name (first claim per wallet) + sign message → claim; ready / success / already claimed / expired screens |
-| `/profile/[wallet]` | `app/profile/[wallet]/ProfileView.tsx` | On-chain attendance + tier; `me`/`demo` = connected wallet |
+| `/profile/[wallet]` | `app/profile/[wallet]/ProfileView.tsx` | Private check-ins, receipts, legacy badges and tier; `me`/`demo` = connected wallet |
 | `/verify` | `app/verify/VerifyView.tsx` | Look up any wallet (linked from My track record, not the header) |
 | `/organizer/[id]` (role badge) | `app/organizer/[id]/RecipientsView.tsx` | Who has a contribution badge, "Award to more people", Revoke |
 | `/openings/[id]` | `app/openings/[id]/OpeningView.tsx` | Opening with a rule: check, apply with a wallet signature |
@@ -77,7 +78,7 @@ Track-record routes (`app/api/`): `GET/POST clubs`, `PATCH clubs/[id]` (admin, v
 `GET clubs/[id]/roster` (club passcode; read-only: everyone holding a club badge, events attended
 and role badges, names only for self-check-ins; powers the dashboard's Members and Overview tabs).
 
-API routes (`app/api/`): `GET/POST events` (`?counts=1` adds attendee counts from mint supply),
+API routes (`app/api/`): `GET/POST events` (`?counts=1` adds attendee counts from the database or legacy mint supply),
 `GET events/[id]/code` (password), `GET events/[id]/attendees` (password; names), `POST claim` (saves the name),
 `GET members/[wallet]` (has a name yes/no, never the name), `GET profile/[wallet]`, `GET balance/[wallet]`,
 `POST organizer/verify` (password check).
@@ -174,10 +175,7 @@ isn't `NEXT_PUBLIC_*`. The server doesn't use `PRIVY_APP_SECRET`.
 Optional and not a secret: `PUBLIC_SITE_URL` (e.g. `https://showedup-phi.vercel.app`). When set,
 check-in QR codes always point there, even if the organizer page was opened at localhost.
 
-**This repo's own test setup (`AayusK/ShowedUp`, since Nov 16):** `.env.local` on Aayus's Mac
-points at a separate Supabase project "ShowedUp" (ref `vrzcdxhjmdceaheuynpi`, organization
-"Impact Developers", same three tables, RLS on, no policies) and a separate organizer wallet
-(`Bn38cCVx4BHdZ6Zcx5rqJinMncYcGyqhJeJe3gfvpfce`), so testing never touches the club's live data.
+**This repository’s deployment.** `AayusK/ShowedUp` deploys to `aayusks-projects/showed-up`. At the receipt rollout, the local checkout and `showed-up.vercel.app` both used Supabase project `enzijcqcmlzeyhbizmov`. Test fixtures created locally can be visible on that site. The original club site at `showedup-phi.vercel.app` is a separate deployment.
 
 The organizer wallet (`8BdUdmWv4n1DaQMxfPUbVTTtNDd2NqcJz4r9BWkorexu`) needs devnet SOL: about
 0.003 SOL per new event and 0.002 SOL per new attendee. The app returns `organizer_unfunded`
@@ -242,7 +240,7 @@ and who's-here cards; one-page track record; shorter home page; restyled claim, 
 openings and pop-ups). Fixes: claim continues after connecting, no "connect" flash on
 `/profile/me`, tier progress bar, QR uses `PUBLIC_SITE_URL` (optional, not secret) and warns on
 localhost, creating an event opens its QR. New feature: officers add someone who missed the scan
-(`db/05_manual_attendance.sql`; officer-added wallets never count as members, so a pasted
+(`db/06_manual_attendance.sql`; officer-added wallets never count as members, so a pasted
 stranger's name stays hidden). Dashboard tabs: Overview (default: next event, term numbers, top
 members, latest activity), Events (with an attendance trend chart), Badges, Members, Openings,
 Activity (the club's slice of `/api/feed`), Clubs (registry admin). Team-lead logins were planned
@@ -271,6 +269,9 @@ Possible next work (ask before starting any of it):
 - **Code sharing:** a screenshot of the code works for up to about 60 s. Accepted; noted in the README.
 - **Removed** `@solana/wallet-adapter-wallets` (Nov 16).
 - **Sign-in:** Privy for email / Google with an embedded Solana wallet; Phantom stays as an option.
+- **Receipts instead of tokens (Nov 17):** new events mint no tokens; only confirmed contributions
+  touch Solana, as a salted-hash memo signed by the club's key. Records include the student's
+  wallet. Details in `SPEC.md` → Decisions made. Don't add new token features.
 - **Clubs:** each club's keypair is `HMAC-SHA256(CLUB_KEY_SECRET, "club:" + id)` as the seed, never
   stored. The organizer pays every fee; the club key signs only as authority.
 - **Badge addresses:** new mints live at `createWithSeed(clubIssuer, eventId, TOKEN_2022_PROGRAM_ID)`,
@@ -289,11 +290,11 @@ Possible next work (ask before starting any of it):
   via `x-chat-name`); members sign in once with a wallet signature at `/chat/[clubId]` and get a
   7-day HMAC token (key = `"chat:" + EVENT_SECRET`, nothing stored), only if `clubMembers` lists
   them. Every club has an "Everyone" group; only officers create, change or archive groups.
-  Members see names of people in their groups. Tables in `db/07_chat.sql`; routes under
+  Members see names of people in their groups. Tables in `db/08_chat.sql`; routes under
   `/api/chat/[clubId]`; UI in `components/ChatPanel.tsx`. Messages refresh by polling (4 s).
 - **Public profiles (Nov 20, owner's OK):** opt-in. A student's name, headline, school, bio, links
   (LinkedIn shown as a button) and skills show on their track record only after they switch it
-  on. Stored in `profiles` (`db/06_profiles.sql`, RLS on, no policies); saving and reading a hidden
+  on. Stored in `profiles` (`db/07_profiles.sql`, RLS on, no policies); saving and reading a hidden
   draft need a fresh wallet signature (`/api/profile-card/[wallet]`). Never on-chain.
 
 ## 8. Gotchas

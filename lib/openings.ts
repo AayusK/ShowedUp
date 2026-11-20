@@ -1,6 +1,7 @@
 // Openings: a club posts a role with a rule ("1 or more Mentor badges from a verified club") and
 // students apply with their track record. Shared by the browser and the server; nothing secret
 // lives in this file.
+import type { ReceiptFile } from "@/lib/receipt";
 import type { Role } from "@/lib/badges";
 import type { ProfileEvent } from "@/lib/profileClient";
 
@@ -45,7 +46,8 @@ export interface CountedBadge {
   role: Role;
   date: string;
   /** The badge's token address on Solana, for the Explorer link. */
-  mint: string;
+  mint: string | null;
+  receiptFile?: ReceiptFile;
 }
 
 /** The answer to "does this wallet meet the rule?". */
@@ -105,7 +107,7 @@ export function ruleSentence(role: Role | null, minCount: number): string {
  * verified club are counted together.
  */
 export function badgesTowardRule(events: ProfileEvent[], role: Role | null): ProfileEvent[] {
-  return events.filter((e) => e.club.verified && (role === null || e.role === role));
+  return events.filter((e) => e.club.verified && e.source !== "checkin" && (role === null || e.role === role));
 }
 
 export function isClosed(closesAt: string | null, now = Date.now()): boolean {

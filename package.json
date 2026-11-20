@@ -6,11 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --import tsx --conditions=react-server --test tests/*.test.ts",
     "lint": "eslint",
     "organizer": "tsx scripts/create-organizer.ts",
     "seed": "tsx --conditions=react-server scripts/seed.ts",
     "fake-badge": "tsx --conditions=react-server scripts/fake-badge.ts",
-    "test": "tsx --conditions=react-server --test tests/*.test.ts"
+    "receipt:demo": "tsx --conditions=react-server scripts/receipt-demo.ts",
+    "receipt:verify": "tsx scripts/verify-receipt.ts"
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.51.4",

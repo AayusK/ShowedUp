@@ -1,4 +1,5 @@
 // Client-side types + fetcher for GET /api/profile/[wallet].
+import type { ReceiptFile } from "@/lib/receipt";
 import type { ClubInfo } from "@/lib/clubs";
 import type { BadgeKind, Role } from "@/lib/badges";
 
@@ -8,9 +9,11 @@ export interface ProfileEvent {
   name: string;
   date: string;
   location?: string;
-  mint: string;
+  mint: string | null;
+  /** Sent only in a wallet-authorized view or to the club receiving an application. */
+  receiptFile?: ReceiptFile;
   /** Where the name and date came from: the token itself, or (older events) our database. */
-  source: "chain" | "database";
+  source: "chain" | "database" | "checkin" | "receipt";
   /** The verified club that issued this badge, worked out from the token's issuer on-chain. */
   club: ClubInfo;
   /** "attendance" (claimed with the QR code) or "contribution" (awarded by an officer). */

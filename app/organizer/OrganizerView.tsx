@@ -10,7 +10,7 @@ import { formatDay } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
 import { termOf } from "@/lib/trackRecord";
 import { getTier } from "@/lib/tiers";
-import { timeAgo, type FeedItem } from "@/lib/feed";
+import { feedText, timeAgo, type FeedItem } from "@/lib/feed";
 import { checkSession, clubHeaders, readSession, saveSession, type OrganizerSession } from "@/lib/organizerSession";
 import { OrganizerAccessModal, type Unlocked } from "@/components/OrganizerAccessModal";
 import { LEGACY_CLUB_ID, LEGACY_CLUB_NAME, type ClubInfo } from "@/lib/clubs";
@@ -24,7 +24,7 @@ interface EventItem {
   name: string;
   date: string;
   location?: string;
-  mint: string;
+  mint: string | null;
   createdAt: string;
   attendees?: number;
   /** "contribution" badges are awarded by an officer; everything else is QR-code attendance. */
@@ -229,6 +229,9 @@ export default function OrganizerView() {
           setAccessError("Your organizer session expired. Enter the passcode again.");
           setAccessModal(true);
           break;
+        case "schema_not_ready":
+          setCreateError("Apply db/05_private_checkins.sql in Supabase before creating a private event.");
+          break;
         case "organizer_unfunded":
           setCreateError(<>The organizer wallet needs devnet SOL. Fund <CopyText value={String(data.organizer)}/> at <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">faucet.solana.com</a>, then try again.</>);
           break;
@@ -245,7 +248,7 @@ export default function OrganizerView() {
           setCreateError(data.message ?? "Check the event details and try again.");
           break;
         default:
-          setCreateError("Couldn’t reach Solana devnet. Wait a moment and try again.");
+          setCreateError("Couldn’t save the event. Check your connection and try again.");
       }
     } catch {
       setCreateError("Couldn’t reach the server. Try again.");
@@ -324,7 +327,7 @@ export default function OrganizerView() {
             <Link role="menuitem" href={`/organizer/${e.id}`}><Icon name="calendar" size={16}/> {next ? "Start check-in" : "Open check-in"}</Link>
             <Link role="menuitem" href={`/organizer/${e.id}`}><Icon name="people" size={16}/> Who showed up</Link>
           </>}
-          <a role="menuitem" href={explorerLink(e.mint)} target="_blank" rel="noreferrer"><Icon name="external" size={16}/> View badge on Solana</a>
+          {e.mint && <a role="menuitem" href={explorerLink(e.mint)} target="_blank" rel="noreferrer"><Icon name="external" size={16}/> View badge on Solana</a>}
         </div>}
       </div>
     </li>;
@@ -434,8 +437,8 @@ export default function OrganizerView() {
           {clubActivity === null ? <div className="skeleton" style={{height: 14, width: "50%", margin: "12px 0"}}/>
             : clubActivity.length === 0 ? <p className="ov-empty">{activity?.stream === "off" ? "The live stream isn’t connected right now." : "Nothing new yet."}</p>
             : <ul className="ov-list">{clubActivity.slice(0, 3).map((item) => <li key={item.signature}>
-                <span className={`home2-feed-ic${item.kind === "contribution" ? " is-role" : ""}`}><Icon name={item.kind === "contribution" ? "spark" : "check"} size={14}/></span>
-                <span className="ov-who"><strong>{item.role ?? "Checked in"}</strong><small>{item.eventName} · {item.wallet}</small></span>
+                <span className={`home2-feed-ic${feedText(item).isRole ? " is-role" : ""}`}><Icon name={feedText(item).isRole ? "spark" : "check"} size={14}/></span>
+                <span className="ov-who"><strong>{feedText(item).title}</strong><small>{feedText(item).detail}</small></span>
                 <small className="ov-time">{activity ? timeAgo(item.at, activity.now) : ""}</small>
               </li>)}</ul>}
           {pending > 0 && <button type="button" className="dash-pending ov-pending" onClick={() => setTab("openings")}>{pending} {pending === 1 ? "application" : "applications"} waiting for a decision →</button>}
@@ -474,8 +477,8 @@ export default function OrganizerView() {
         {clubActivity === null ? <ul className="dash-list"><li className="dash-row"><div className="skeleton" style={{height: 14, width: "40%"}}/></li></ul>
           : clubActivity.length === 0 ? <p className="dash-empty">{activity?.stream === "off" ? "The live stream isn’t connected right now. Check-ins still work; they just won’t show here." : "Nothing new yet. Check-ins and badges show up here within seconds."}</p>
           : <ul className="dash-list">{clubActivity.map((item) => <li key={item.signature} className="dash-row">
-              <span className={`home2-feed-ic${item.kind === "contribution" ? " is-role" : ""}`}><Icon name={item.kind === "contribution" ? "spark" : "check"} size={15}/></span>
-              <span className="dash-name"><strong>{item.role ?? "Checked in"}</strong><span className="dash-sub">{item.eventName} · <code>{item.wallet}</code></span></span>
+              <span className={`home2-feed-ic${feedText(item).isRole ? " is-role" : ""}`}><Icon name={feedText(item).isRole ? "spark" : "check"} size={15}/></span>
+              <span className="dash-name"><strong>{feedText(item).title}</strong><span className="dash-sub">{feedText(item).detail}</span></span>
               <a className="dash-open" href={explorerLink(item.signature, "tx")} target="_blank" rel="noreferrer">{activity ? timeAgo(item.at, activity.now) : ""} <Icon name="external" size={13}/></a>
             </li>)}</ul>}
       </>}
@@ -489,7 +492,7 @@ export default function OrganizerView() {
       {session && admin && tab === "clubs" && <ClubsPanel adminPassword={session.password} />}
     </div>
   </main>
-  {award !== false && session && <AwardModal session={session} existing={award ?? undefined} onClose={() => setAward(false)} onChanged={loadEvents} />}
+  {award !== false && session && <AwardModal session={session} existing={award ?? undefined} events={hosted.filter(e => !e.mint)} onClose={() => setAward(false)} onChanged={loadEvents} />}
   {accessModal && <OrganizerAccessModal startCreating={accessCreating} initialError={accessError} onClose={()=>setAccessModal(false)} onUnlocked={onUnlocked} />}
   {createModal && <div className="modal-overlay" onClick={()=>!createBusy && setCreateModal(false)}><form role="dialog" aria-modal="true" aria-label="Create event" className="modal" onClick={e=>e.stopPropagation()} onSubmit={submitCreate}><button type="button" className="modal-close" aria-label="Close" disabled={createBusy} onClick={()=>setCreateModal(false)}>×</button><span className="eyebrow">MAKE ROOM FOR SOMETHING GOOD</span><h2>A reason to show up.</h2><p>Create an event for your community.</p><label className="field">Event name<input value={name} maxLength={80} placeholder="e.g. Builders Meeting" onChange={e=>setName(e.target.value)}/></label><div className="form-columns"><label className="field">Date<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label><label className="field">Time<input type="time" value={time} onChange={e=>setTime(e.target.value)}/></label></div><label className="field">Location<input value={location} maxLength={80} placeholder="e.g. UBC Nest, Room 2504 (optional)" onChange={e=>setLocation(e.target.value)}/></label><button type="submit" className="button primary full" disabled={createBusy}>{createBusy ? "Creating event token…" : "Create event"} <Icon name="arrow" size={16}/></button>{createError && <p className="form-error" role="alert">{createError}</p>}<small>Creates a nontransferable Token-2022 token on Solana devnet. The organizer wallet pays the fee. Takes a few seconds.</small></form></div>}
   </>;

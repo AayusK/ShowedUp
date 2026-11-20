@@ -1,7 +1,7 @@
 // The live feed on the home page: badges the QuickNode Stream saw being handed out on Solana,
 // across every verified club. Shared by the browser and the server; nothing secret lives here.
 
-export interface FeedItem {
+interface TokenFeedItem {
   /** Shortened "abcd…wxyz". The full address is never sent. */
   wallet: string;
   /** Only for contribution badges (Volunteer, Speaker, ...). Null for attendance. */
@@ -15,6 +15,13 @@ export interface FeedItem {
   /** The transaction that minted the badge. */
   signature: string;
 }
+
+export type FeedItem = TokenFeedItem | {
+  kind: "receipt";
+  club: string;
+  at: string;
+  signature: string;
+};
 
 export interface FeedResponse {
   items: FeedItem[];
@@ -33,4 +40,13 @@ export function timeAgo(iso: string, now: Date): string {
   if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
   return `${Math.floor(seconds / 86400)} d ago`;
+}
+
+/**
+ * How to show any feed item in one line. Receipts carry no person or event on purpose (they're
+ * private); token badges show the role (or "Attended"), the event and a short wallet.
+ */
+export function feedText(item: FeedItem): { title: string; detail: string; isRole: boolean } {
+  if (item.kind === "receipt") return { title: "Contribution confirmed", detail: `${item.club} · signed receipt`, isRole: true };
+  return { title: item.role ?? "Attended", detail: `${item.eventName} · ${item.wallet}`, isRole: item.kind === "contribution" };
 }

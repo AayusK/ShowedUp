@@ -1,6 +1,6 @@
 # ShowedUp UI/UX polish audit
 
-**Date:** 2026-11-05 · **Status:** audit done; item 16 implemented (see the progress log), the rest waiting for the owner to pick.
+**Date:** 2026-11-05 · **Status:** audit done; items 1–5, 11 (partly), 12, 16–19, 25, 26, 33 implemented (see the progress log), the rest waiting for the owner to pick. Screens added in the hackathon (clubs, openings, award, recipients, tabbed track record, live feed) were never audited.
 
 This is Phase 1 of the frontend polish request. Phase 2 = implement the items the owner approves,
 3–6 at a time, grouped by page or theme, with lint + typecheck + desktop/mobile screenshots after
@@ -88,6 +88,24 @@ busy labels and double-tap protection work.
 
 33. ⭐ **Timezone bug.** "Checking in today" / "Past event" are computed during server rendering on Vercel (UTC). In the evening (Pacific) the label can be wrong or cause a hydration warning. → Compute them in the browser after load. **S**
 
+## Hackathon screens (audited 2026-11-19)
+
+Playwright at 1280px and 375px on the test database (home, `/openings/[id]`, `/organizer` signed out,
+`/organizer/[id]` for a role badge, tabbed profile), plus a code read of the signed-in panels
+(`ClubsPanel`, `OpeningsPanel`, `AwardModal`, `RecipientsView`). Screenshots in
+`.playwright-mcp/audit2/` (gitignored). No console errors and no horizontal scroll at 375px. Already
+good: errors use `role="alert"`, the award modal is a labelled dialog with Esc, the profile tabs
+support arrow keys, and the opening page reads well on a phone.
+
+34. ⭐ **Token wording will be wrong once receipts land.** "Each attendee holds one nontransferable token", "View token" (home cards), "Event token" (organizer rows), the organizer notice, and the create-event note ("Creates a nontransferable Token-2022 token"). → Rewrite together with the receipts switch, so the copy matches what happens on-chain. **S** (copy only; do it in the receipts step)
+35. ⭐ **Two taps to check an opening.** `/openings/[id]` "Sign in to check" / "Connect it instead" opens sign-in, then the student must tap again (same as #12). → Reuse the claim page's carry-on-after-connect pattern. **S**
+36. **"View my track record" four times on home** (hero + every section heading). On phones it wraps to two lines next to each heading. → Keep the hero button; drop the section links, or keep one. **S 🔍**
+37. **Signed-out `/organizer` says "Your events"** and shows the default club's stats and rows to anyone. The data is public anyway (home shows events), but the wording implies you're signed in. → "UBC Builders Club events" when signed out, or lead with the "Organizer access" prompt. **S**
+38. **Revoke uses `window.confirm`.** A grey browser dialog for the one irreversible action (`RecipientsView`). → An in-page confirm that names the person and says it can't be re-awarded. **S 🔍**
+39. **Item 21 still open:** "Organizer access" next to the workspace badge is 10px grey (`.organizer-access>.text-link`), hard to spot. **S**
+40. **Item 7 now covers the new pages too:** openings and recipients pages are also titled "ShowedUp". **S**
+
+
 ## Progress log
 
 Record each implemented batch here (date, item numbers, commit), so the next session knows what's left.
@@ -95,4 +113,6 @@ Record each implemented batch here (date, item numbers, commit), so the next ses
 | Date | Items | Commit | Notes |
 |---|---|---|---|
 | 2026-11-16 | 16 | (see git log: "Add full-screen Present mode") | "Present on a projector" button on the check-in page opens a full-screen layout (also asks the browser for real full screen; Esc or Exit leaves). Measured at 1280×720: QR box 475px (66% of height), code 40px, countdown bar 12px, attendee count 115px, latest 6 names, no scrolling. New CSS classes are prefixed `present-`; the normal page is unchanged apart from the button. |
+| 2026-11-05 (logged 11-18) | 1, 2, 3 (Esc + aria; no copy item), 4, 5, 11 (check-in only), 13 (keyframes), 17, 18, 19, 33 | "UI polish batch 1" + "UI animation batch" in the original `ojas-desh06/showedup` repo, carried into this one | Found in the code on Nov 18; they were never added to this log. |
+| 2026-11-18 | 12, 25, 26 | (pending) | 12: after "Connect wallet / Sign in to claim", the signature step starts by itself once the wallet is ready; a wallet with no name yet gets the name box focused instead. 25: the tabbed profile's tier text now has a thin progress bar toward the next tier (`.profile-record-tier-track`). 26: `/profile/me` shows "One moment…" while Phantom reconnects (at most 2 s) instead of flashing "Connect your wallet". |
 | 2026-11-18 – 11-20 | 1, 12, 15, 25, 26, (33 already fixed) | branch `claude/pensive-ritchie-gk73lm` | Owner-approved redesign (see CLAUDE.md §3): new frosted top bar with two tabs, one row on phones (1); claim continues after the wallet connects (12); expired claim screen leads with "scan the newest QR", home button secondary (15); tier progress bar with a stop per tier (25); `/profile/me` waits for the wallet to reconnect (26). Item 33 was already fixed in code (labels computed in the browser). Every page restyled: dashboard, check-in, claim, track record, home, verify, openings, pop-ups. |

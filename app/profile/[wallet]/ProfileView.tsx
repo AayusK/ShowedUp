@@ -4,12 +4,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { Icon } from "@/components/Icon";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TrackRecordShare } from "@/components/TrackRecordShare";
 import { TrackRecordUnverified } from "@/components/TrackRecordUnverified";
-import { fetchProfile, type ProfileResult } from "@/lib/profileClient";
+import { signedRead } from "@/lib/privateAccess";
+import { fetchProfile, type Profile, type ProfileResult } from "@/lib/profileClient";
 import { useEmbeddedWallet } from "@/lib/embeddedWallet";
 import { ProfileRecord, RecordSummary } from "./ProfileRecord";
 import { ProfileCardEditor, ProfileCardHeader } from "./ProfileCardView";
@@ -19,23 +21,23 @@ import type { ProfileCard } from "@/lib/profileCard";
 const SELF_ALIASES = new Set(["me", "demo"]);
 
 export default function ProfileView({ walletParam }: { walletParam: string }) {
-  const { publicKey, wallet, connecting } = useWallet();
+  const { publicKey, wallet, connecting, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
   // "Me" is a connected Phantom wallet, or the wallet that came with an email / Google sign-in.
   const embedded = useEmbeddedWallet();
   const connectedWallet = publicKey?.toBase58() ?? embedded.address ?? null;
-  // Still finding out whether the visitor is signed in, or their wallet is being created.
-  const signInPending = embedded.enabled && !publicKey && (!embedded.ready || (embedded.authenticated && !embedded.address));
-  // Phantom reconnects on its own a moment after the page loads (autoConnect). Until it has had
-  // that moment, don't tell a returning user to "connect your wallet". The remembered wallet is
-  // only read after the first render, so give everyone a short grace period, and a longer one
-  // when a wallet was remembered.
-  const [graceOver, setGraceOver] = useState(false);
+  // Phantom reconnects on its own after a page load (autoConnect), but not instantly. If a wallet
+  // was used before and is available, give it a moment instead of flashing "Connect your wallet".
+  // The 2 s cap means a reconnect that never happens can't leave the page stuck on "One moment…".
+  const [reconnectGrace, setReconnectGrace] = useState(true);
   useEffect(() => {
-    const timer = window.setTimeout(() => setGraceOver(true), wallet ? 4000 : 800);
-    return () => window.clearTimeout(timer);
-  }, [wallet]);
-  const walletRestoring = !publicKey && (connecting || !graceOver);
+    const t = setTimeout(() => setReconnectGrace(false), 2000);
+    return () => clearTimeout(t);
+  }, []);
+  const walletAvailable = wallet?.readyState === WalletReadyState.Installed || wallet?.readyState === WalletReadyState.Loadable;
+  const phantomPending = !publicKey && (connecting || (reconnectGrace && walletAvailable));
+  // Still finding out whether the visitor is signed in, or their wallet is being created.
+  const signInPending = phantomPending || (embedded.enabled && !publicKey && (!embedded.ready || (embedded.authenticated && !embedded.address)));
   const isSelfRoute = SELF_ALIASES.has(walletParam);
   const target = isSelfRoute ? connectedWallet : walletParam;
 
@@ -51,32 +53,21 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
     return () => { cancelled = true; };
   }, [target]);
 
-  // The student's public profile card (name, school, bio, LinkedIn…), shown above the record.
-  const [card, setCard] = useState<{ wallet: string; card: ProfileCard | null } | null>(null);
-  const [editing, setEditing] = useState(false);
-  useEffect(() => {
-    if (!target) return;
-    let cancelled = false;
-    fetch(`/api/profile-card/${encodeURIComponent(target)}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { card: null }))
-      .then((d: { card?: ProfileCard | null }) => { if (!cancelled) setCard({ wallet: target, card: d.card ?? null }); })
-      .catch(() => { if (!cancelled) setCard({ wallet: target, card: null }); });
-    return () => { cancelled = true; };
-  }, [target]);
-  const shownCard = card?.wallet === target ? card.card : null;
-
   const shell = (body: ReactNode, extra = "") => <><SiteHeader view="profile" /><main className={`shell${extra}`}>{body}</main><SiteFooter /></>;
   // Sign-in, loading and error screens use the same card as the claim page.
   const message = (symbol: string, title: string, text: string, action?: ReactNode) => shell(<div className="center-page"><div className="claim-panel"><div className="large-symbol"><Icon name={symbol} size={32}/></div><h1>{title}</h1><p>{text}</p>{action}</div></div>, " claim-v2");
 
-  if (isSelfRoute && !connectedWallet && (signInPending || walletRestoring)) {
-    return message("spark", "One moment…", "Looking for your wallet.");
+  if (isSelfRoute && !connectedWallet && signInPending) {
+    return message("spark", "One moment…", "Checking whether you’re signed in.");
   }
   if (isSelfRoute && !connectedWallet && embedded.enabled) {
     return message("wallet", "Your presence, collected.", "Sign in to see the events you’ve shown up to.", <><button className="button primary full" style={{marginTop: 25}} onClick={() => embedded.login()}>Sign in <Icon name="arrow" size={17}/></button><p className="claim-name-known" style={{marginTop: 18}}>Have a Phantom wallet? <button type="button" className="text-link" onClick={() => setVisible(true)}>Connect it instead</button></p><Link className="text-link" href="/verify" style={{marginTop: 4}}>Or verify any wallet <Icon name="arrow" size={16}/></Link></>);
   }
   if (isSelfRoute && !connectedWallet) {
     return message("wallet", "Your presence, collected.", "Connect your wallet to see the events you’ve shown up to.", <><button className="button primary full" style={{marginTop: 25}} onClick={() => setVisible(true)}>Connect wallet <Icon name="wallet" size={17}/></button><Link className="text-link" href="/verify" style={{marginTop: 20}}>Or verify any wallet <Icon name="arrow" size={16}/></Link></>);
+  }
+  if (connectedWallet && target === connectedWallet) {
+    return shell(<OwnerRecord key={target} wallet={target} publicResult={result} sign={publicKey ? signMessage : embedded.signMessage} />, " rec-page");
   }
   if (!result) {
     return message("spark", "Gathering the track record…", "Reading badges from Solana devnet.");
@@ -85,15 +76,66 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
     return message("shield", "That’s not a wallet address.", "Check the link, or look up a wallet on the Verify page.", <Link className="button primary full" style={{marginTop: 25}} href="/verify">Verify attendance <Icon name="arrow" size={16}/></Link>);
   }
   if (!result.ok) {
-    return message("shield", "Couldn’t reach Solana devnet.", "Your attendance is safe on-chain. Refresh in a moment to try again.");
+    return message("shield", "Couldn’t reach Solana devnet.", "Refresh in a moment to load this wallet’s public badges.");
   }
-  const { profile } = result;
-  const isMine = profile.wallet === connectedWallet;
-  return shell(<>
-    <div className="pc-wrap"><ProfileCardHeader card={shownCard} isMine={isMine} onEdit={() => setEditing(true)} summary={<RecordSummary profile={profile} />} /></div>
-    <ProfileRecord key={profile.wallet} profile={profile} isMine={isMine} />
-    {editing && isMine && <ProfileCardEditor wallet={profile.wallet} initial={shownCard} onClose={() => setEditing(false)} onSaved={(c) => { setCard({ wallet: profile.wallet, card: c }); setEditing(false); }} />}
-    <TrackRecordUnverified badges={profile.unverified ?? []} total={profile.unverifiedTotal ?? 0}/>
+  return shell(<RecordContent profile={result.profile} isMine={false} />, " rec-page");
+}
+
+/**
+ * The opt-in profile card (name, school, About, LinkedIn…) above the record, loaded for whichever
+ * wallet is shown. Its owner can edit it; visitors see it only once it's switched on.
+ */
+function useProfileCard(wallet: string) {
+  const [card, setCard] = useState<{ wallet: string; card: ProfileCard | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/profile-card/${encodeURIComponent(wallet)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { card: null }))
+      .then((d: { card?: ProfileCard | null }) => { if (!cancelled) setCard({ wallet, card: d.card ?? null }); })
+      .catch(() => { if (!cancelled) setCard({ wallet, card: null }); });
+    return () => { cancelled = true; };
+  }, [wallet]);
+  return [card?.wallet === wallet ? card.card : null, (c: ProfileCard) => setCard({ wallet, card: c })] as const;
+}
+
+function RecordContent({ profile, isMine }: { profile: Profile; isMine: boolean }) {
+  const [card, setCard] = useProfileCard(profile.wallet);
+  const [editing, setEditing] = useState(false);
+  return <>
+    <div className="pc-wrap"><ProfileCardHeader card={card} isMine={isMine} onEdit={() => setEditing(true)} summary={<RecordSummary profile={profile} />} /></div>
+    <ProfileRecord profile={profile} isMine={isMine} />
+    {editing && isMine && <ProfileCardEditor wallet={profile.wallet} initial={card} onClose={() => setEditing(false)} onSaved={(c) => { setCard(c); setEditing(false); }} />}
+    <TrackRecordUnverified badges={profile.unverified} total={profile.unverifiedTotal}/>
     <TrackRecordShare wallet={profile.wallet} isMine={isMine}/>
-  </>);
+  </>;
+}
+
+function OwnerRecord({ wallet, publicResult, sign }: {
+  wallet: string; publicResult?: ProfileResult; sign?: (bytes: Uint8Array) => Promise<Uint8Array>;
+}) {
+  const [unlocked, setUnlocked] = useState<Profile | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function unlock() {
+    if (!sign || busy) return;
+    setBusy(true); setError("");
+    try {
+      const res = await signedRead(`/api/profile/${wallet}`, "profile", wallet, sign);
+      if (!res.ok) throw new Error();
+      setUnlocked(await res.json());
+    } catch {
+      setError("Couldn’t open your private record. Approve the wallet signature and try again.");
+    } finally { setBusy(false); }
+  }
+  const profile = unlocked ?? (publicResult?.ok ? publicResult.profile : null);
+  return <>
+    {(!unlocked || unlocked.partial) && <section className="panel rec-unlock-private">
+      <button className="button primary" onClick={unlock} disabled={busy || !sign}>
+        {busy ? "Opening private record…" : unlocked ? "Refresh private record" : "View my private check-ins and receipts"}
+      </button>
+      {!sign && <p>This wallet needs message signing to open your private record.</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </section>}
+    {profile && <RecordContent profile={profile} isMine/>}
+  </>;
 }

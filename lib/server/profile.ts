@@ -124,7 +124,7 @@ export async function judgeBadge(
  * still show for the default club (and `partial` is set).
  */
 export async function getProfile(owner: PublicKey): Promise<Profile> {
-  const connection = getConnection();
+  const connection = await getConnection();
   const [accounts, dbEvents, dbClubs] = await Promise.all([
     withRetry(() => connection.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_2022_PROGRAM_ID }, "confirmed")),
     readEvents().catch((): EventRecord[] | null => null),

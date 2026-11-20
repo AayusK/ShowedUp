@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
 import { authorizeClub, ownsEvent } from "@/lib/server/auth";
+import { CONTRIBUTION_ROLES, isRole } from "@/lib/badges";
+import { confirmContribution } from "@/lib/server/contributions";
 import { awardBadge } from "@/lib/server/awards";
 import { ClubKeyError } from "@/lib/server/clubs";
 import { getEvent } from "@/lib/server/events";
@@ -33,7 +35,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Another club's badge answers the same as a wrong passcode.
   if (!ownsEvent(club, event)) return error("unauthorized", 401);
   // Attendance is only ever claimed in the room with the QR code.
-  if (event.kind !== "contribution") return error("not_contribution", 400);
+  if (event.mint && event.kind !== "contribution") return error("not_contribution", 400);
 
   let body: Record<string, unknown>;
   try {
@@ -53,6 +55,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
+    if (!event.mint) {
+      const { role, summary } = body;
+      if (!isRole(role) || !CONTRIBUTION_ROLES.includes(role) || typeof summary !== "string"
+        || !summary.trim() || summary.trim().length > 600) return error("invalid_contribution", 400);
+      const result = await confirmContribution(event, club, owner.toBase58(), role, summary.trim());
+      if (result.status === "not_checked_in" || result.status === "different_summary") return error(result.status, 409);
+      if (result.status === "in_progress") return error("in_progress", 409);
+      return NextResponse.json(result);
+    }
     const result = await awardBadge(event, club, owner);
     if (result.status === "in_progress") return error("in_progress", 409);
     return NextResponse.json(result);

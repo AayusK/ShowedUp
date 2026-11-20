@@ -369,6 +369,9 @@ body:has(.profile-record) { background: #f7f8fa; }
 .tier-progress-labels span.reached { color: var(--profile-ink); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .tier-progress-fill { transition: none; } }
 .profile-record-tier strong { color: var(--profile-ink); }
+.profile-record-tier-track { flex-basis: 100%; height: 6px; border-radius: 6px; background: var(--profile-line); overflow: hidden; }
+.profile-record-tier-track > div { height: 100%; border-radius: 6px; background: var(--profile-green); transition: width .6s ease; }
+@media (prefers-reduced-motion: reduce) { .profile-record-tier-track > div { transition: none; } }
 @media (max-width: 520px) {
   .profile-record-person { gap: 8px 10px; padding-inline: 13px; }
   .profile-record-verify { margin-left: 0; }
@@ -1006,3 +1009,7 @@ body{font-family:var(--font-geist-sans),ui-sans-serif,system-ui,-apple-system,"S
 @media (max-width:640px){.chat{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);height:78vh}.chat-groups{border-right:0;border-bottom:1px solid var(--hair)}.chat-groups ul{display:flex;gap:6px;overflow-x:auto;padding:4px 10px 10px}.chat-groups li button{white-space:nowrap}.chat-g-text small{display:none}.chat-msg{max-width:88%}.chat-name-field{flex-wrap:wrap}.chat-name-field input{min-width:0;flex:1}}
 .chat>*{min-width:0}
 @media (max-width:640px){.chat{width:100%}.chat-room-head{padding:10px 12px}.chat-room-actions{width:100%}.chat-room-actions .button{flex:1}.chat-msgs{padding:10px 12px}}
+.rec-summary{font-size:13px;color:var(--ink-2);margin:2px 0}
+.rec-private{font-size:12px;color:var(--sub);background:#f1f3f7;border-radius:999px;padding:2px 8px}
+.rec-unlock-private{display:flex;flex-direction:column;gap:8px;align-items:flex-start;max-width:760px;margin:24px auto 0;padding:18px 22px;border-radius:24px}
+.rec-unlock-private p{font-size:13.5px;color:var(--sub);margin:0}

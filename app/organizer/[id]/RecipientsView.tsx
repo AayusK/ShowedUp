@@ -85,7 +85,7 @@ export default function RecipientsView({ event, club }: { event: EventRecord; cl
       <div className="ci-title">
         <Link className="ci-back" href="/organizer">← {club.name}</Link>
         <h1>{event.name}</h1>
-        <p><span className={`rec-pill rec-role-${event.role}`}>{event.role}</span> {formatDay(event.date)} · <a href={explorerLink(event.mint)} target="_blank" rel="noreferrer">Badge on Solana <Icon name="external" size={13}/></a></p>
+        <p><span className={`rec-pill rec-role-${event.role}`}>{event.role}</span> {formatDay(event.date)}{event.mint && <> · <a href={explorerLink(event.mint)} target="_blank" rel="noreferrer">Badge on Solana <Icon name="external" size={13}/></a></>}</p>
       </div>
       <button className="button primary ci-present" disabled={!session} onClick={() => setAwardModal(true)}><Icon name="plus" size={16}/> Award to more people</button>
     </div>

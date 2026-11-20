@@ -8,6 +8,7 @@ import { Icon } from "@/components/Icon";
 import { CopyText } from "@/components/CopyText";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { AwardModal } from "../AwardModal";
 import { OrganizerAccessModal } from "@/components/OrganizerAccessModal";
 import { formatDay, formatTime } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
@@ -40,6 +41,7 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
   const inFlight = useRef(false);
   const [attendees, setAttendees] = useState<number | null>(null);
   // Present mode: the same check-in, laid out full screen for a projector.
+  const [awarding, setAwarding] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [countBump, setCountBump] = useState(false);
   const prevAttendees = useRef<number | null>(null);
@@ -100,7 +102,7 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
 
   // Live check-in count, read from the event token's on-chain supply.
   useEffect(() => {
-    if (!event) return;
+    if (!event?.mint) return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -133,7 +135,7 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
         });
         if (!res.ok) return;
         const data = (await res.json()) as { attendees: Attendee[]; revocable?: boolean };
-        if (!cancelled) { setRoster(data.attendees); setRevocable(!!data.revocable); }
+        if (!cancelled) { setRoster(data.attendees); setRevocable(!!data.revocable); if (!event.mint) setAttendees(data.attendees.length); }
       } catch {}
     };
     load();
@@ -196,7 +198,7 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.status === "awarded") { setAddNote({ ok: true, text: `${label} was added. Their badge is on Solana.` }); setAddQuery(""); }
       else if (res.ok) setAddNote({ ok: true, text: `${label} already has this badge.` });
-      else if (data.error === "schema_not_ready") setAddNote({ ok: false, text: "Run db/05_manual_attendance.sql in Supabase first, then try again." });
+      else if (data.error === "schema_not_ready") setAddNote({ ok: false, text: "Run db/06_manual_attendance.sql in Supabase first, then try again." });
       else if (data.error === "organizer_unfunded") setAddNote({ ok: false, text: <>The organizer wallet needs devnet SOL. Fund <CopyText value={String(data.organizer)}/> at <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">faucet.solana.com</a>.</> });
       else if (data.error === "invalid_wallet") setAddNote({ ok: false, text: "That isn’t a Solana wallet address." });
       else if (res.status === 401) setAddNote({ ok: false, text: "Your officer sign-in has expired. Reload and enter the passcode again." });
@@ -272,8 +274,9 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
       <div className="ci-title">
         <Link className="ci-back" href="/organizer">← {club.name}</Link>
         <h1>{event.name}</h1>
-        <p>{formatDay(event.date)} · {formatTime(event.date)}{event.location && <> · {event.location}</>} · <a href={explorerLink(event.mint)} target="_blank" rel="noreferrer">Badge on Solana <Icon name="external" size={13}/></a></p>
+        <p>{formatDay(event.date)} · {formatTime(event.date)}{event.location && <> · {event.location}</>}{event.mint && <> · <a href={explorerLink(event.mint)} target="_blank" rel="noreferrer">Badge on Solana <Icon name="external" size={13}/></a></>}</p>
       </div>
+      {!event.mint && session && <button type="button" className="button secondary ci-present" onClick={() => setAwarding(true)}><Icon name="spark" size={15}/> Confirm a contribution</button>}
       <button type="button" className="button primary ci-present present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button>
     </div>
     <div className="ci-grid">
@@ -310,6 +313,7 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
         {streamedCount > 0 && roster && <small className="ci-stream">{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
       </aside>
     </div>
+    {awarding && session && <AwardModal session={session} events={[event]} onClose={() => setAwarding(false)} onChanged={() => setRosterTick(t => t + 1)} />}
   </main><SiteFooter />
   {presenting && <div className={`present${urgency ? " " + urgency : ""}`} role="dialog" aria-modal="true" aria-label={`Check-in for ${event.name}, full screen`}>
     <button type="button" className="present-exit" onClick={() => setPresenting(false)}>Exit <kbd>Esc</kbd></button>

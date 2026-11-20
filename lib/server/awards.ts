@@ -19,6 +19,7 @@ export type AwardResult =
  * can't mint twice.
  */
 export async function awardBadge(event: EventRecord, club: ClubRecord, owner: PublicKey, opts: { addedByOfficer?: boolean } = {}): Promise<AwardResult> {
+  if (!event.mint) throw new Error("A legacy badge needs a mint");
   const mint = new PublicKey(event.mint);
   const wallet = owner.toBase58();
 

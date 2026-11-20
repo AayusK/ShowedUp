@@ -8,7 +8,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { formatEventDetail, isToday } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
 import { formatClosingDay, ruleSentence, type OpeningInfo } from "@/lib/openings";
-import { timeAgo, type FeedItem, type FeedResponse } from "@/lib/feed";
+import { feedText, timeAgo, type FeedItem, type FeedResponse } from "@/lib/feed";
 
 const FEED_POLL_MS = 15_000;
 
@@ -58,7 +58,7 @@ interface HomeEvent {
   name: string;
   date: string;
   location?: string;
-  mint: string;
+  mint: string | null;
 }
 
 type HomeOpening = Pick<OpeningInfo, "id" | "title" | "clubName" | "role" | "minCount" | "closesAt">;
@@ -81,12 +81,12 @@ export default function HomeView({ events, openings = [] }: { events: HomeEvent[
       <div className="home2-copy">
         <span className="home2-pill"><i/> Proof of showing up, on Solana</span>
         <h1>Every time you show up,<br/><span>it adds up.</span></h1>
-        <p>Clubs hand out badges for showing up, mentoring and speaking. You keep them in your own track record and take it to the next club. No fees, no crypto know-how needed.</p>
+        <p>Clubs record when you show up and sign what you contributed, like mentoring or speaking. Your track record goes with you to the next club. No fees, no crypto know-how needed.</p>
         <div className="home2-actions">
           <Link className="button primary" href="/profile/me">See my track record <Icon name="arrow" size={16}/></Link>
           <Link className="button secondary" href="/organizer">Run a club <Icon name="arrow" size={16}/></Link>
         </div>
-        {todayEvent && <a className="home2-today" href={explorerLink(todayEvent.mint)} target="_blank" rel="noreferrer"><span className="home2-live"/> Checking in today: <strong>{todayEvent.name}</strong> · {formatEventDetail(todayEvent.date, todayEvent.location, clientNow ?? undefined)}</a>}
+        {todayEvent && <p className="home2-today"><span className="home2-live"/> Checking in today: <strong>{todayEvent.name}</strong> · {formatEventDetail(todayEvent.date, todayEvent.location, clientNow ?? undefined)}</p>}
       </div>
       <div className="home2-card" aria-hidden="true">
         <div className="home2-card-top"><span>Track record</span><span><Icon name="shield" size={12}/> Verified on Solana</span></div>
@@ -103,8 +103,8 @@ export default function HomeView({ events, openings = [] }: { events: HomeEvent[
         <div className="home2-panel-head"><h2>Live across clubs</h2><span className="home2-src"><span className="home2-live"/> Solana · QuickNode Streams</span></div>
         {feed && feed.items.length > 0
           ? <ul className="home2-feed">{feed.items.map((item) => <li key={item.signature}>
-              <span className={`home2-feed-ic${item.kind === "contribution" ? " is-role" : ""}`}><Icon name={item.kind === "contribution" ? "spark" : "check"} size={15}/></span>
-              <div><strong>{item.role ?? "Attended"} <span>· {item.club}</span></strong><small>{item.eventName} · {item.wallet}</small></div>
+              <span className={`home2-feed-ic${feedText(item).isRole ? " is-role" : ""}`}><Icon name={feedText(item).isRole ? "spark" : "check"} size={15}/></span>
+              <div><strong>{feedText(item).title} <span>· {item.club}</span></strong><small>{feedText(item).detail}</small></div>
               <a href={explorerLink(item.signature, "tx")} target="_blank" rel="noreferrer" aria-label="View on Solana">{timeAgo(item.at, feed.now)} <Icon name="external" size={12}/></a>
             </li>)}</ul>
           : <p className="home2-empty">{feed === null ? "Loading the live feed…" : "Quiet right now. New badges appear here the moment Solana confirms them."}</p>}

@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   // Each page sets its own title ("Club · ShowedUp"); the home page keeps the plain name.
   title: { default: "ShowedUp", template: "%s · ShowedUp" },
-  description: "Soulbound proof-of-attendance for student clubs on Solana",
+  description: "Private club check-ins and verifiable contribution receipts",
 };
 
 export default function RootLayout({

@@ -9,7 +9,7 @@ export interface EventRecord {
   /** Local wall-clock time "YYYY-MM-DDTHH:mm" (no timezone), as the organizer entered it. */
   date: string;
   location?: string;
-  mint: string;
+  mint: string | null;
   createdAt: string;
   /** The club that issued this event's badge. Absent = the default club (older events). */
   clubId?: string;
@@ -24,7 +24,7 @@ interface EventRow {
   name: string;
   starts_at: string; // Postgres `timestamp` comes back as "YYYY-MM-DDTHH:mm:ss"
   location: string | null;
-  mint: string;
+  mint: string | null;
   created_at: string;
   club_id?: string | null;
   kind?: string | null;
@@ -50,14 +50,6 @@ async function selectWithFallback<T>(run: (columns: string) => PromiseLike<{ dat
     result = await run(columns);
   }
   return result;
-}
-
-/** True once db/02_role_badges.sql has been run (the `kind` and `role` columns exist). */
-export async function supportsRoleBadges(): Promise<boolean> {
-  const { error } = await db().from("events").select("kind, role").limit(1);
-  if (error && MISSING_COLUMN.has(error.code ?? "")) return false;
-  if (error) throw new Error(`events read failed: ${error.message}`);
-  return true;
 }
 
 function fromRow(r: EventRow): EventRecord {

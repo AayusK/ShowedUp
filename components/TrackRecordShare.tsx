@@ -61,7 +61,7 @@ export function TrackRecordShare({ wallet, isMine }: { wallet: string; isMine: b
       <div className="tr-share-row">
         <div className="tr-share-copy">
           <h2>{isMine ? "Share your track record" : "Share this track record"}</h2>
-          <p>Anyone with the link sees the same verified badges.{isMine ? " Your profile shows only if you switched it on." : ""}</p>
+          <p>Anyone with the link sees the same public badges. To show a private contribution, share its downloaded receipt.{isMine ? " Your profile shows only if you switched it on." : ""}</p>
         </div>
         <div className="tr-share-actions">
           {canShare && <button type="button" className="button primary" onClick={share} disabled={!url}>Share <Icon name="arrow" size={15}/></button>}

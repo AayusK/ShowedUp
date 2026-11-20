@@ -15,6 +15,7 @@ import { useEmbeddedWallet } from "@/lib/embeddedWallet";
 import { NAME_MAX, cleanName } from "@/lib/memberName";
 import { formatDay } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
+import { signedRead } from "@/lib/privateAccess";
 import { applyMessage, formatClosingDay, ruleSentence, type ApplicationStatus, type OpeningInfo, type RuleCheck } from "@/lib/openings";
 
 type Busy = null | "checking" | "signing" | "applying";
@@ -27,6 +28,13 @@ const STATUS_LINE: Record<ApplicationStatus, string> = {
 };
 
 export default function OpeningView({ opening }: { opening: OpeningInfo | null }) {
+  const { publicKey } = useWallet();
+  const embedded = useEmbeddedWallet();
+  // Unmount private results immediately on an account switch, including requests still in flight.
+  return <OpeningForWallet key={`${opening?.id}/${publicKey?.toBase58() ?? embedded.address ?? ""}`} opening={opening}/>;
+}
+
+function OpeningForWallet({ opening }: { opening: OpeningInfo | null }) {
   const { connected, publicKey, signMessage, wallets, disconnect } = useWallet();
   // Email / Google sign-in with a wallet created behind the scenes (off unless PRIVY_APP_ID is set).
   const embedded = useEmbeddedWallet();
@@ -91,7 +99,9 @@ export default function OpeningView({ opening }: { opening: OpeningInfo | null }
     setError("");
     setBusy("checking");
     try {
-      const res = await fetch(`/api/openings/${o.id}/check?wallet=${encodeURIComponent(walletAddress)}`, { cache: "no-store" });
+      const sign = usingEmbedded ? embedded.signMessage : signMessage;
+      if (!sign) { setError("Connect a wallet that supports message signing."); return; }
+      const res = await signedRead(`/api/openings/${o.id}/check`, `opening/${o.id}`, walletAddress, sign);
       const data = await res.json().catch(() => ({}));
       if (res.ok) { setCheck(data as RuleCheck); setClosed(!!data.closed); return; }
       switch (data.error) {
@@ -101,7 +111,7 @@ export default function OpeningView({ opening }: { opening: OpeningInfo | null }
         default: setError("Something went wrong on our side. Try again in a moment.");
       }
     } catch {
-      setError("Couldn’t reach the server. Check your connection and try again.");
+      setError("Couldn’t check your record. Approve the wallet signature and try again.");
     } finally {
       setBusy(null);
     }
@@ -177,7 +187,7 @@ export default function OpeningView({ opening }: { opening: OpeningInfo | null }
 
   return <><SiteHeader view="claim" />
   <main className="shell claim-v2"><div className="center-page"><Link href="/" className="back-link">← Back to overview</Link><div className="claim-panel opening-panel"><div className={`large-symbol${closed && !outcome ? " neutral-symbol" : ""}${outcome?.kind === "applied" ? " pop" : ""}`}><Icon name={done ? "check" : "people"} size={32}/></div><Badge>{o.clubName}</Badge><h1>{o.title}</h1>{o.description && <p className="opening-description">{o.description}</p>}
-    <div className="opening-rule"><span className="eyebrow">WHO CAN APPLY</span><strong>{rule}</strong><small>Badges from every verified club count together. They’re read from Solana, not from a form.{closed ? " This opening has closed." : closesLabel ? ` Open until ${closesLabel}.` : ""}</small></div>
+    <div className="opening-rule"><span className="eyebrow">WHO CAN APPLY</span><strong>{rule}</strong><small>Badges from every verified club count together. Signed contribution receipts and legacy token badges count.{closed ? " This opening has closed." : closesLabel ? ` Open until ${closesLabel}.` : ""}</small></div>
 
     {!outcome && <>
       {offerPhantom && !embedded.enabled
@@ -188,13 +198,13 @@ export default function OpeningView({ opening }: { opening: OpeningInfo | null }
         ? `${check.counted} of your verified ${roleWord}${check.counted === 1 ? "badge counts" : "badges count"} toward this rule (${check.needed} needed).`
         : `You have ${check.counted} of the ${check.needed} ${roleWord}${check.needed === 1 ? "badge" : "badges"} this opening asks for. ${check.remaining} more from a verified club and you’re in.`}</p>{check.partial && <p>We couldn’t read every club just now, so some badges may be missing. Try again in a moment.</p>}</div></div>}
 
-      {check && check.badges.length > 0 && <ul className="opening-badges" aria-label="Badges that counted">{check.badges.map((b) => <li key={b.mint}><span className="history-check"><Icon name="shield" size={16}/></span><div><strong>{b.name}</strong><small>{b.club} · {b.role} · {formatDay(b.date)}</small></div><a className="icon-link" href={explorerLink(b.mint)} target="_blank" rel="noreferrer" aria-label={`View ${b.name} on Solana Explorer`} title="View on Solana Explorer"><Icon name="external" size={16}/></a></li>)}</ul>}
+      {check && check.badges.length > 0 && <ul className="opening-badges" aria-label="Badges that counted">{check.badges.map((b) => <li key={b.receiptFile?.receipt.signature ?? b.mint}><span className="history-check"><Icon name="shield" size={16}/></span><div><strong>{b.name}</strong><small>{b.club} · {b.role} · {formatDay(b.date)}</small></div><a className="icon-link" href={b.receiptFile ? explorerLink(b.receiptFile.receipt.signature, "tx") : explorerLink(b.mint!)} target="_blank" rel="noreferrer" aria-label={`View ${b.name} on Solana Explorer`} title="View on Solana Explorer"><Icon name="external" size={16}/></a></li>)}</ul>}
       {check && check.counted > check.badges.length && check.badges.length > 0 && <small className="claim-note">Showing the newest {check.badges.length} of {check.counted}.</small>}
 
       {check?.qualifies && closed && <p className="opening-consent">This opening has closed, so it isn’t taking applications any more.</p>}
 
       {canApply && <>
-        <p className="opening-consent"><strong>Before you apply:</strong> applying shows your saved name and the badges on your track record to {o.clubName}’s officers, so they can decide. Nobody else sees your name. It is never shown on a public page and never written to Solana.</p>
+        <p className="opening-consent"><strong>Before you apply:</strong> applying shares your saved name and the matching badges and contribution receipts with {o.clubName}’s officers, so they can decide. Nobody else sees your name. It is never shown on a public page and never written to Solana.</p>
         {nameKnown === false && <label className="field claim-name">Your name<input type="text" placeholder="How the club’s officers will see you" autoComplete="name" maxLength={NAME_MAX} value={name} onChange={e=>setName(e.target.value)} disabled={busy !== null}/><small>We don’t have a name for this wallet yet. It’s saved only once you apply.</small></label>}
         <button className="button primary full" onClick={doApply} disabled={busy !== null || nameKnown === null}>{applyLabel}<Icon name="arrow" size={17}/></button>
         <small className="claim-note">{busy === "signing" && !usingEmbedded ? "Signing is free and doesn’t send anything. It just proves this wallet is yours." : "You’ll confirm with your wallet. It’s free. Already applied? Applying again just shows where your application stands."}</small>

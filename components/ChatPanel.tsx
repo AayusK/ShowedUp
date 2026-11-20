@@ -39,7 +39,7 @@ export function ChatPanel({ clubId, headers, officer, loadMembers }: {
       const res = await fetch(`${base}/groups`, { headers: JSON.parse(headersKey), cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error === "schema_not_ready" ? "Chat isn’t set up yet: run db/07_chat.sql in Supabase." : data.error === "unauthorized" ? "Your chat sign-in expired. Sign in again." : "Couldn’t load the chat.");
+        setError(data.error === "schema_not_ready" ? "Chat isn’t set up yet: run db/08_chat.sql in Supabase." : data.error === "unauthorized" ? "Your chat sign-in expired. Sign in again." : "Couldn’t load the chat.");
         setGroups([]);
         return;
       }
@@ -176,7 +176,7 @@ export function ChatPanel({ clubId, headers, officer, loadMembers }: {
           ? await fetch(`${base}/groups`, { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify({ name, purpose, members: wallets }) })
           : await fetch(`${base}/groups/${openId}`, { method: "PATCH", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify({ add: wallets }) });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) return data.message ?? (data.error === "schema_not_ready" ? "Run db/07_chat.sql in Supabase first." : "Couldn’t save. Try again.");
+        if (!res.ok) return data.message ?? (data.error === "schema_not_ready" ? "Run db/08_chat.sql in Supabase first." : "Couldn’t save. Try again.");
         setModal(null);
         await loadGroups();
         if (modal === "new" && data.id) setOpenId(data.id);

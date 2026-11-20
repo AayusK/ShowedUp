@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { EMPTY_CARD, type ProfileCard } from "@/lib/profileCard";
 
-// Postgres / PostgREST codes for "that table doesn't exist": db/06_profiles.sql hasn't been run.
+// Postgres / PostgREST codes for "that table doesn't exist": db/07_profiles.sql hasn't been run.
 const MISSING_TABLE = new Set(["42P01", "PGRST205"]);
 
 export class ProfilesNotReadyError extends Error {}

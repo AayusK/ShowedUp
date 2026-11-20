@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { gunzipSync } from "zlib";
-import { extractClaims, storeChainClaims, verifyStreamSignature } from "@/lib/server/streamClaims";
+import { extractDelivery, storeReceiptObservations, storeChainClaims, verifyStreamSignature } from "@/lib/server/streamClaims";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +44,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
 
-  const claims = extractClaims(payload);
+  const { claims, receipts } = extractDelivery(payload);
   try {
-    const { stored, ignored } = await storeChainClaims(claims);
-    return NextResponse.json({ received: claims.length, stored, ignored });
+    const [tokens, memos] = await Promise.all([storeChainClaims(claims), storeReceiptObservations(receipts)]);
+    return NextResponse.json({ received: claims.length + receipts.length, stored: tokens.stored + memos.stored, ignored: tokens.ignored + memos.ignored });
   } catch (e) {
     // A non-2xx answer makes QuickNode retry the delivery, so nothing is lost.
     console.error("[api/streams/claims] store failed:", e instanceof Error ? e.message.split("\n")[0] : "unknown");

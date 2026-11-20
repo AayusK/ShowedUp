@@ -7,7 +7,7 @@ import { clubMembers } from "./members";
 import { newId } from "./ids";
 import { CHAT_NAME_MAX, cleanText, type ChatGroup, type ChatMessage } from "@/lib/chat";
 
-// Postgres / PostgREST codes for "that table doesn't exist": db/07_chat.sql hasn't been run.
+// Postgres / PostgREST codes for "that table doesn't exist": db/08_chat.sql hasn't been run.
 const MISSING_TABLE = new Set(["42P01", "PGRST205"]);
 export class ChatNotReadyError extends Error {}
 function check<T extends { error: { code?: string; message: string } | null }>(r: T, what: string): T {

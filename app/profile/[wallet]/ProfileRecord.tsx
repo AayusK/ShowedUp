@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ReceiptDownload } from "@/components/ReceiptDownload";
 import { Icon } from "@/components/Icon";
 import { shortAddress, type Profile, type ProfileEvent } from "@/lib/profileClient";
 import { explorerLink } from "@/lib/solana";
@@ -37,6 +38,14 @@ function TierProgress({ profile }: { profile: Profile }) {
     </div>
   );
 }
+
+/** Where a badge can be checked on Solana: its receipt's transaction, or its token. Private
+ * check-ins have neither (they live in the club's private roster). */
+function proofLink(e: ProfileEvent): string | null {
+  if (e.receiptFile) return explorerLink(e.receiptFile.receipt.signature, "tx");
+  return e.mint ? explorerLink(e.mint) : null;
+}
+const badgeKey = (e: ProfileEvent) => `${e.id}:${e.role}:${e.mint ?? ""}`;
 
 /** A role pill in that role's colour: "Mentor", "Speaker", ... or "Attended" for attendance. */
 function RolePill({ event }: { event: ProfileEvent }) {
@@ -126,11 +135,12 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
           </div>
           <ul className="rec-contribs">
             {contributions.map((e) => (
-              <li key={e.mint} className={`rec-contrib rec-edge-${e.role}`}>
+              <li key={badgeKey(e)} className={`rec-contrib rec-edge-${e.role}`}>
                 <RolePill event={e} />
                 <strong>{e.name}</strong>
                 <span>{e.club.name} · {formatDay(e.date)}</span>
-                <a href={explorerLink(e.mint)} target="_blank" rel="noreferrer" aria-label={`View ${e.name} badge on Solana Explorer`}>Solana <Icon name="external" size={12} /></a>
+                {e.receiptFile && <><p className="rec-summary">{String(e.receiptFile.record.summary ?? "")}</p><ReceiptDownload file={e.receiptFile} /></>}
+                {proofLink(e) && <a href={proofLink(e)!} target="_blank" rel="noreferrer" aria-label={`View ${e.name} on Solana Explorer`}>Solana <Icon name="external" size={12} /></a>}
               </li>
             ))}
           </ul>
@@ -156,11 +166,11 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
                 <h3>{term.label}</h3>
                 <ul>
                   {term.events.map((e) => (
-                    <li key={e.mint}>
+                    <li key={badgeKey(e)}>
                       <RolePill event={e} />
                       <strong>{e.name}</strong>
                       <span className="rec-date">{formatDay(e.date)}</span>
-                      <a href={explorerLink(e.mint)} target="_blank" rel="noreferrer" aria-label={`View ${e.name} badge on Solana Explorer`}><Icon name="external" size={14} /></a>
+                      {proofLink(e) ? <a href={proofLink(e)!} target="_blank" rel="noreferrer" aria-label={`View ${e.name} on Solana Explorer`}><Icon name="external" size={14} /></a> : <span className="rec-private" title="Private check-in, kept in the club's roster">Private</span>}
                     </li>
                   ))}
                 </ul>
@@ -174,3 +184,4 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
     </div>
   );
 }
+

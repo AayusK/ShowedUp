@@ -1,6 +1,6 @@
 // A student's public profile card (name, headline, school, bio, links, skills), shown at the top
 // of their track record once they switch it on. Shared by the browser and the server; nothing
-// secret lives here. Stored in Supabase (db/06_profiles.sql), never on-chain.
+// secret lives here. Stored in Supabase (db/07_profiles.sql), never on-chain.
 
 export interface ProfileCard {
   displayName: string;

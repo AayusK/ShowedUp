@@ -12,7 +12,7 @@ export function validClubId(id: string): boolean {
   return id === LEGACY_CLUB_ID || CLUB_ID_RE.test(id);
 }
 
-/** Shared error mapping: a missing table means db/07_chat.sql hasn't been run. */
+/** Shared error mapping: a missing table means db/08_chat.sql hasn't been run. */
 export function chatFailure(e: unknown, where: string) {
   if (e instanceof ChatNotReadyError) return chatError("schema_not_ready", 503);
   console.error(`[api/chat] ${where} failed:`, e instanceof Error ? e.message.split("\n")[0] : "unknown");

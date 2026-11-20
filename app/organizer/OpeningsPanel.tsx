@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { ReceiptDownload } from "@/components/ReceiptDownload";
 import { Icon } from "@/components/Icon";
 import { explorerLink } from "@/lib/solana";
 import { ROLES } from "@/lib/badges";
@@ -195,7 +196,10 @@ export function OpeningsPanel({ session, club }: { session: OrganizerSession; cl
           {list !== null && list.applicants.length === 0 && <p className="applicants-note">Nobody has applied yet. Share the public page with students.</p>}
           {list?.applicants.map((a) => <div className="applicant-row" key={a.wallet}>
             <div className="event-info"><h3>{a.name ?? shortAddress(a.wallet)}</h3><p>{recordSummary(a, o.minCount)}</p>
-              <div className="applicant-links"><Link className="text-link" href={`/profile/${a.wallet}`}>Track record <Icon name="arrow" size={13}/></Link><a className="text-link" href={explorerLink(a.wallet)} target="_blank" rel="noreferrer">Wallet on Solana Explorer <Icon name="external" size={13}/></a>{a.summary?.badges.map((b) => <a className="text-link" key={b.mint} href={explorerLink(b.mint)} target="_blank" rel="noreferrer">{b.role} · {b.name} <Icon name="external" size={13}/></a>)}</div></div>
+              <div className="applicant-links"><Link className="text-link" href={`/profile/${a.wallet}`}>Track record <Icon name="arrow" size={13}/></Link><a className="text-link" href={explorerLink(a.wallet)} target="_blank" rel="noreferrer">Wallet on Solana Explorer <Icon name="external" size={13}/></a>{a.summary?.badges.map(b => <span key={b.receiptFile?.receipt.signature ?? b.mint}>
+                <a className="text-link" href={b.receiptFile ? explorerLink(b.receiptFile.receipt.signature, "tx") : explorerLink(b.mint!)} target="_blank" rel="noreferrer">{b.role} · {b.name} <Icon name="external" size={13}/></a>
+                {b.receiptFile && <ReceiptDownload file={b.receiptFile}/>}
+              </span>)}</div></div>
             <span className={`quiet-pill applicant-status ${a.status}`}>{STATUS_LABEL[a.status]}</span>
             <div className="applicant-actions"><button className="button primary" disabled={rowBusy === a.wallet || a.status === "accepted"} onClick={() => decide(o.id, a, "accepted")}>{rowBusy === a.wallet ? "Saving…" : "Accept"}</button><button className="button secondary" disabled={rowBusy === a.wallet || a.status === "declined"} onClick={() => decide(o.id, a, "declined")}>Decline</button></div>
           </div>)}
