@@ -195,7 +195,7 @@ async function main() {
     club,
   };
 
-  const connection = getConnection();
+  const connection = await getConnection();
   const plan = await buildFakeBadgeTransaction(connection, organizer.publicKey, fakeIssuer.publicKey, owner, details);
 
   const balance = await withRetry(() => connection.getBalance(organizer.publicKey));

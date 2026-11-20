@@ -15,7 +15,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ wal
     return NextResponse.json({ error: "invalid_wallet" }, { status: 400 });
   }
   try {
-    const lamports = await withRetry(() => getConnection().getBalance(owner, "confirmed"));
+    const connection = await getConnection();
+    const lamports = await withRetry(() => connection.getBalance(owner, "confirmed"));
     return NextResponse.json({ sol: lamports / LAMPORTS_PER_SOL }, { headers: { "cache-control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "rpc_error" }, { status: 502 });

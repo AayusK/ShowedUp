@@ -47,7 +47,7 @@ export async function isRevocable(event: Pick<EventRecord, "mint">, club: Pick<C
 }
 
 async function readRevocable(address: string, club: Pick<ClubRecord, "issuer">): Promise<boolean> {
-  const connection = getConnection();
+  const connection = await getConnection();
   const mint = await withRetry(() =>
     getMint(connection, new PublicKey(address), "confirmed", TOKEN_2022_PROGRAM_ID),
   );
@@ -58,8 +58,9 @@ async function readRevocable(address: string, club: Pick<ClubRecord, "issuer">):
 /** How many tokens this token account holds (0 if it doesn't exist). */
 async function heldAmount(ata: PublicKey): Promise<bigint> {
   try {
+    const connection = await getConnection();
     const account = await withRetry(() =>
-      getAccount(getConnection(), ata, "confirmed", TOKEN_2022_PROGRAM_ID),
+      getAccount(connection, ata, "confirmed", TOKEN_2022_PROGRAM_ID),
     );
     return account.amount;
   } catch (e) {
@@ -91,7 +92,7 @@ export async function revokeBadge(event: EventRecord, club: ClubRecord, owner: P
 
   const organizer = getOrganizerKeypair();
   const clubKey = getClubKeypair(club);
-  const connection = getConnection();
+  const connection = await getConnection();
 
   const balance = await withRetry(() => connection.getBalance(organizer.publicKey));
   if (balance < FEE_BUFFER_LAMPORTS) {

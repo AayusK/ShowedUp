@@ -11,7 +11,9 @@ import type { ProfileEvent } from "../lib/profileClient";
 import { MEMO_PROGRAM_ID, RECEIPT_FORMAT, receiptMemo, recordHash, verifyReceipt, type ReceiptFile } from "../lib/receipt";
 import { authorizePrivateRead } from "../lib/server/privateAccess";
 import { readPages } from "../lib/server/db";
-import { sendReceipt } from "../lib/server/receipts";
+import { getConnection } from "../lib/server/mint";
+import { PUBLIC_DEVNET_RPC } from "../lib/solana";
+import { sendReceipt, verifyDevnetReceipt } from "../lib/server/receipts";
 import { extractDelivery } from "../lib/server/streamClaims";
 
 const payer = "Bn38cCVx4BHdZ6Zcx5rqJinMncYcGyqhJeJe3gfvpfce";
@@ -90,4 +92,37 @@ test("wallet history and rosters can read past the first thousand database rows"
   const rows = Array.from({ length: 1001 }, (_, index) => index);
   const result = await readPages(async (first, last) => ({ data: rows.slice(first, last + 1), error: null }));
   assert.deepEqual(result, { data: rows, error: null });
+});
+
+test("a custom endpoint is used for transactions only after confirming the devnet genesis", async (t) => {
+  const previous = process.env.RPC_URL;
+  t.after(() => { if (previous === undefined) delete process.env.RPC_URL; else process.env.RPC_URL = previous; });
+  let genesis = "different-cluster";
+  const check = t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
+    assert.equal(JSON.parse(String(init.body)).method, "getGenesisHash");
+    return Response.json({ result: genesis });
+  });
+  process.env.RPC_URL = "https://wrong.example";
+  assert.equal((await getConnection()).rpcEndpoint, PUBLIC_DEVNET_RPC);
+  genesis = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
+  process.env.RPC_URL = "https://devnet.example";
+  const [first, second] = await Promise.all([getConnection(), getConnection()]);
+  assert.equal(first.rpcEndpoint, process.env.RPC_URL);
+  assert.equal(first, second);
+  assert.equal(check.mock.callCount(), 2);
+});
+
+test("an RPC missing a receipt falls back to public devnet for transaction history", async (t) => {
+  const previous = process.env.RPC_URL;
+  t.after(() => { if (previous === undefined) delete process.env.RPC_URL; else process.env.RPC_URL = previous; });
+  const custom = "https://short-history.example";
+  process.env.RPC_URL = custom;
+  t.mock.method(globalThis, "fetch", async () => Response.json({ result: "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG" }));
+  const attempted: string[] = [];
+  t.mock.method(Connection.prototype, "getTransaction", async function (this: Connection) {
+    attempted.push(this.rpcEndpoint);
+    return null;
+  });
+  assert.deepEqual(await verifyDevnetReceipt(file, payer), { ok: false, reason: "not_found" });
+  assert.deepEqual(attempted, [custom, PUBLIC_DEVNET_RPC]);
 });

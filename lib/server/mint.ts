@@ -45,9 +45,34 @@ export class BadgeTooLargeError extends Error {
   }
 }
 
-export function getConnection(): Connection {
-  // RPC_URL (e.g. a Helius devnet URL with its API key) is server-only and never sent to browsers.
-  return new Connection(process.env.RPC_URL || PUBLIC_DEVNET_RPC, "confirmed");
+// The genesis block identifies the cluster even when the RPC URL has a custom hostname.
+const DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
+const publicDevnet = new Connection(PUBLIC_DEVNET_RPC, "confirmed");
+let checkedRpc: { url: string; until: number; connection: Promise<Connection> } | undefined;
+
+async function selectDevnet(url: string): Promise<Connection> {
+  try {
+    const response = await fetch(url, {
+      method: "POST", cache: "no-store", redirect: "error", signal: AbortSignal.timeout(4500),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getGenesisHash", params: [] }),
+    });
+    if (response.ok && (await response.json()).result === DEVNET_GENESIS) return new Connection(url, "confirmed");
+  } catch {
+    // A misconfigured or unreachable custom RPC must never receive a signed transaction.
+  }
+  console.warn("[solana] Custom RPC could not confirm Solana devnet. Using the public devnet endpoint.");
+  return publicDevnet;
+}
+
+/** Resolve one confirmed devnet connection for reads and writes, including concurrent cold starts. */
+export async function getConnection(): Promise<Connection> {
+  const url = process.env.RPC_URL?.trim();
+  if (!url || url === PUBLIC_DEVNET_RPC) return publicDevnet;
+  if (!checkedRpc || checkedRpc.url !== url || Date.now() >= checkedRpc.until) {
+    checkedRpc = { url, until: Date.now() + 60_000, connection: selectDevnet(url) };
+  }
+  return checkedRpc.connection;
 }
 
 /** Retry once after a short pause; the public devnet RPC rate-limits. */
@@ -204,7 +229,7 @@ export function buildEventMintInstructions(
 export async function createEventMint(details: EventMintDetails, issuer?: Keypair): Promise<{ mint: string; signature: string }> {
   const organizer = getOrganizerKeypair();
   const club = issuer ?? organizer;
-  const connection = getConnection();
+  const connection = await getConnection();
   const mint = await badgeMintAddress(club.publicKey, details.id);
 
   const metadata = eventTokenMetadata(mint, club.publicKey, details);
