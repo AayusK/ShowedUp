@@ -49,8 +49,9 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
     return () => { cancelled = true; };
   }, [target]);
 
-  const shell = (body: ReactNode) => <><SiteHeader view="profile" /><main className="shell">{body}</main><SiteFooter /></>;
-  const message = (symbol: string, title: string, text: string, action?: ReactNode) => shell(<div className="center-page"><div className="claim-panel"><div className="large-symbol"><Icon name={symbol} size={32}/></div><h1>{title}</h1><p>{text}</p>{action}</div></div>);
+  const shell = (body: ReactNode, extra = "") => <><SiteHeader view="profile" /><main className={`shell${extra}`}>{body}</main><SiteFooter /></>;
+  // Sign-in, loading and error screens use the same card as the claim page.
+  const message = (symbol: string, title: string, text: string, action?: ReactNode) => shell(<div className="center-page"><div className="claim-panel"><div className="large-symbol"><Icon name={symbol} size={32}/></div><h1>{title}</h1><p>{text}</p>{action}</div></div>, " claim-v2");
 
   if (isSelfRoute && !connectedWallet && (signInPending || walletRestoring)) {
     return message("spark", "One moment…", "Looking for your wallet.");
