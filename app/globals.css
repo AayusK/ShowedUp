@@ -841,3 +841,12 @@ body{font-family:var(--font-geist-sans),ui-sans-serif,system-ui,-apple-system,"S
 .rec-role-Volunteer{background:#fbf0de;color:#a35f00}
 .rec-role-Organizer{background:#e9efff;color:#1a3fd1}
 .rec-role-Officer{background:#eceff2;color:#3f4b57}
+/* Theme leftovers: countdown bar, date tiles, small badges and the footer logo in the blue palette. */
+.ci-qr .countdown-track>div{background:var(--blue)}
+.date-tile{background:#f4f6fb;border:1px solid var(--hair);color:var(--ink);border-radius:12px}
+.date-tile small{color:var(--blue);font-weight:600}
+.badge{background:var(--blue-soft);color:var(--blue);font-weight:600}
+.badge .dot{background:var(--blue)}
+.footer .brand-mark{background:linear-gradient(140deg,#5d87ff,#1733b0)}
+.footer .brand{color:var(--ink-2)}
+.large-symbol{background:var(--blue-soft);color:var(--blue);border-color:#dbe4ff}
