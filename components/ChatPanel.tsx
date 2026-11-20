@@ -95,9 +95,10 @@ export function ChatPanel({ clubId, headers, officer, loadMembers }: {
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setDraft("");
+        setError("");
         lastId.current = Math.max(lastId.current, data.message.id);
         setMessages((m) => [...m, data.message]);
-      } else setError(data.error === "unauthorized" ? "Your chat sign-in expired. Sign in again." : "Couldn’t send. Try again.");
+      } else setError(data.error === "unauthorized" ? "Your chat sign-in expired. Sign in again." : data.error === "slow_down" ? "You’re sending fast. Wait a minute, then try again." : "Couldn’t send. Try again.");
     } catch { setError("Couldn’t reach the server."); } finally { setSending(false); }
   }
   function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {

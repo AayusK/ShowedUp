@@ -158,8 +158,20 @@ export async function readMessages(actor: ChatActor, groupId: string, after?: nu
   return (after ? rows : rows.reverse()).map(toMessage);
 }
 
+/** Thrown when someone posts more than RATE_MAX messages in a minute in one group. */
+export class ChatRateLimitError extends Error {}
+const RATE_MAX = 10;
+
 export async function postMessage(actor: ChatActor, groupId: string, body: string): Promise<ChatMessage | null> {
   if (!(await groupFor(actor, groupId))) return null;
+  // A brake on flooding: count this author's messages in the last minute (members by wallet,
+  // officers by their display name). Several server instances share the database, so this works
+  // across them, unlike an in-memory counter.
+  const since = new Date(Date.now() - 60_000).toISOString();
+  let recent = db().from("chat_messages").select("id", { count: "exact", head: true }).eq("group_id", groupId).gte("created_at", since);
+  recent = actor.kind === "member" ? recent.eq("author_wallet", actor.wallet) : recent.eq("author_kind", "officer").eq("author_name", actor.name);
+  const { count } = check(await recent, "chat rate check");
+  if ((count ?? 0) >= RATE_MAX) throw new ChatRateLimitError();
   const { data } = check(await db().from("chat_messages").insert({
     group_id: groupId, author_kind: actor.kind, author_wallet: actor.kind === "member" ? actor.wallet : null, author_name: actor.name, body,
   }).select("id, author_kind, author_wallet, author_name, body, created_at").single(), "chat message save");

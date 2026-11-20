@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { chatActor, postMessage, readMessages } from "@/lib/server/chat";
+import { ChatRateLimitError, chatActor, postMessage, readMessages } from "@/lib/server/chat";
 import { CHAT_BODY_MAX, cleanText } from "@/lib/chat";
 import { NO_STORE, chatError, chatFailure, validClubId } from "../../../_shared";
 
@@ -33,6 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ clu
     const message = await postMessage(actor, groupId, text);
     return message ? NextResponse.json({ message }, { status: 201, headers: NO_STORE }) : chatError("not_found", 404);
   } catch (e) {
+    if (e instanceof ChatRateLimitError) return chatError("slow_down", 429);
     return chatFailure(e, "post message");
   }
 }
