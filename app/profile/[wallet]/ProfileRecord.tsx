@@ -57,7 +57,26 @@ function CopyWallet({ wallet }: { wallet: string }) {
   return <button type="button" className="rec-copy" onClick={copy} aria-label="Copy wallet address">{copied ? <><Icon name="check" size={13} /> Copied</> : "Copy"}</button>;
 }
 
+/**
+ * "Regular unlocked": shown once, on your own record, the first time this browser sees you at a
+ * new tier. Remembered in this browser only (a convenience; nothing is saved on the server).
+ */
+function useTierUnlock(wallet: string, tier: string | null, isMine: boolean): string | null {
+  const [unlocked, setUnlocked] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isMine || !tier) return;
+    const key = `showedup-tier-seen:${wallet}`;
+    let seen: string | null = null;
+    try { seen = localStorage.getItem(key); } catch { return; }
+    // The very first visit just records the tier: no banner for a tier you already had.
+    if (seen !== null && seen !== tier) setUnlocked(tier);
+    try { localStorage.setItem(key, tier); } catch {}
+  }, [wallet, tier, isMine]);
+  return unlocked;
+}
+
 export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: boolean }) {
+  const unlocked = useTierUnlock(profile.wallet, profile.tier, isMine);
   const clubs = groupTrackRecord(profile.events);
   const contributions = profile.events
     .filter((e) => e.kind === "contribution")
@@ -88,6 +107,8 @@ export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: b
           <div><strong>{clubs.length}</strong><span>{clubs.length === 1 ? "club" : "clubs"}</span></div>
         </div>
       </section>
+
+      {unlocked && <p className="rec-unlock" role="status"><Icon name="spark" size={18}/><span><strong>{unlocked} unlocked.</strong> Keep showing up.</span></p>}
 
       {profile.partial && <p className="rec-notice" role="status">Some badges may be missing right now. Refresh to try again.</p>}
 
