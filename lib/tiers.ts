@@ -3,7 +3,7 @@ export interface Tier {
   min: number;
 }
 
-const TIERS: Tier[] = [
+export const TIERS: Tier[] = [
   { name: "Showed Up", min: 1 },
   { name: "Regular", min: 3 },
   { name: "Core Member", min: 5 },

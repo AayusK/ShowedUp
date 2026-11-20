@@ -8,7 +8,7 @@ each batch (see CLAUDE.md section 1).
 
 ## Constraints for Phase 2 (from the owner, non-negotiable)
 
-- Not a redesign. Keep the visual identity: colors, fonts, layout, copy tone, CSS class names.
+- ~~Not a redesign. Keep the visual identity: colors, fonts, layout, copy tone, CSS class names.~~ **2026-11-18: lifted by the owner. A real visual and structural redesign is allowed; the other constraints below still apply.**
 - Styling stays in plain CSS in `app/globals.css` (no Tailwind utility rewrites, no CSS-in-JS).
 - No new dependencies without asking first.
 - Frontend only: don't touch `app/api/*`, `lib/server/*`, or any Solana/transaction logic.
@@ -115,3 +115,4 @@ Record each implemented batch here (date, item numbers, commit), so the next ses
 | 2026-11-16 | 16 | (see git log: "Add full-screen Present mode") | "Present on a projector" button on the check-in page opens a full-screen layout (also asks the browser for real full screen; Esc or Exit leaves). Measured at 1280×720: QR box 475px (66% of height), code 40px, countdown bar 12px, attendee count 115px, latest 6 names, no scrolling. New CSS classes are prefixed `present-`; the normal page is unchanged apart from the button. |
 | 2026-11-05 (logged 11-18) | 1, 2, 3 (Esc + aria; no copy item), 4, 5, 11 (check-in only), 13 (keyframes), 17, 18, 19, 33 | "UI polish batch 1" + "UI animation batch" in the original `ojas-desh06/showedup` repo, carried into this one | Found in the code on Nov 18; they were never added to this log. |
 | 2026-11-18 | 12, 25, 26 | (pending) | 12: after "Connect wallet / Sign in to claim", the signature step starts by itself once the wallet is ready; a wallet with no name yet gets the name box focused instead. 25: the tabbed profile's tier text now has a thin progress bar toward the next tier (`.profile-record-tier-track`). 26: `/profile/me` shows "One moment…" while Phantom reconnects (at most 2 s) instead of flashing "Connect your wallet". |
+| 2026-11-18 – 11-20 | 1, 12, 15, 25, 26, (33 already fixed) | branch `claude/pensive-ritchie-gk73lm` | Owner-approved redesign (see CLAUDE.md §3): new frosted top bar with two tabs, one row on phones (1); claim continues after the wallet connects (12); expired claim screen leads with "scan the newest QR", home button secondary (15); tier progress bar with a stop per tier (25); `/profile/me` waits for the wallet to reconnect (26). Item 33 was already fixed in code (labels computed in the browser). Every page restyled: dashboard, check-in, claim, track record, home, verify, openings, pop-ups. |

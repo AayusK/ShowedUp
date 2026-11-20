@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { Badge } from "@/components/Badge";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { OrganizerAccessModal } from "@/components/OrganizerAccessModal";
@@ -81,17 +80,27 @@ export default function RecipientsView({ event, club }: { event: EventRecord; cl
   };
 
   return <><SiteHeader view="event" />
-  <main className="shell">
-    <Link className="back-link" href="/organizer">← All events</Link>
-    <div className="page-intro"><Badge>{club.name} · Contribution badge</Badge><h1>{event.name}<span className="green-period">.</span></h1><p>{event.role} · {formatDay(event.date)}</p></div>
-    <div className="section-heading"><div><span className="eyebrow">ON THEIR TRACK RECORD</span><h2>Who has this badge</h2></div><button className="button primary" disabled={!session} onClick={() => setAwardModal(true)}><Icon name="plus" size={17}/> Award to more people</button></div>
-    <div className="panel event-list recipients-list">
-      {recipients === null && <div className="event-row"><div className="event-info"><h3>{loadError ? "Couldn’t load who has this badge." : !checkedSaved || session ? "Loading…" : "Sign in to see who has this badge."}</h3>{loadError && <p>Refresh the page to try again.</p>}</div></div>}
-      {recipients?.length === 0 && <div className="event-row"><div className="event-info"><h3>Nobody yet.</h3><p>Award it to someone who checked in, or paste a wallet address.</p></div></div>}
-      {recipients?.map((r) => <div className="event-row" key={r.wallet}><span className="history-check"><Icon name="check" size={17}/></span><div className="event-info"><h3>{r.name}</h3><p>{r.wallet.slice(0, 4)}…{r.wallet.slice(-4)}</p></div><a className="pill-link" href={`/profile/${r.wallet}`}>Track record <Icon name="arrow" size={14}/></a>{revocable && <button type="button" className="text-link revoke-button" disabled={revoking !== null} onClick={() => revoke(r)}>{revoking === r.wallet ? "Revoking…" : "Revoke"}</button>}</div>)}
+  <main className="shell ci">
+    <div className="ci-head">
+      <div className="ci-title">
+        <Link className="ci-back" href="/organizer">← {club.name}</Link>
+        <h1>{event.name}</h1>
+        <p><span className={`rec-pill rec-role-${event.role}`}>{event.role}</span> {formatDay(event.date)}{event.mint && <> · <a href={explorerLink(event.mint)} target="_blank" rel="noreferrer">Badge on Solana <Icon name="external" size={13}/></a></>}</p>
+      </div>
+      <button className="button primary ci-present" disabled={!session} onClick={() => setAwardModal(true)}><Icon name="plus" size={16}/> Award to more people</button>
     </div>
-    {revokeError && <p className="form-error revoke-error" role="alert">{revokeError}</p>}
-    {event.mint && <div className="token-details"><Icon name="shield" size={17}/><span>Badge token<small>{event.name} · {event.role} · Token-2022 · Nontransferable · issued by {club.name}</small></span><a className="pill-link" href={explorerLink(event.mint)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div>}
+    <section className="ci-card rcp" aria-label="Who has this badge">
+      <div className="ci-count"><strong>{recipients?.length ?? "–"}</strong><span>{recipients?.length === 1 ? "person has this badge" : "people have this badge"}</span></div>
+      {recipients === null && <p className="rcp-empty">{loadError ? "Couldn’t load who has this badge. Refresh to try again." : !checkedSaved || session ? "Loading…" : "Sign in to see who has this badge."}</p>}
+      {recipients?.length === 0 && <p className="rcp-empty">Nobody yet. Award it to someone who checked in, or paste a wallet address.</p>}
+      {recipients && recipients.length > 0 && <ul className="rcp-list">{recipients.map((r) => <li key={r.wallet}>
+        <span className="rcp-av" aria-hidden="true">{Array.from(r.name)[0]?.toUpperCase()}</span>
+        <div><strong>{r.name}</strong><code>{r.wallet.slice(0, 4)}…{r.wallet.slice(-4)}</code></div>
+        <a className="rcp-link" href={`/profile/${r.wallet}`}>Track record <Icon name="arrow" size={13}/></a>
+        {revocable && <button type="button" className="text-link revoke-button" disabled={revoking !== null} onClick={() => revoke(r)}>{revoking === r.wallet ? "Revoking…" : "Revoke"}</button>}
+      </li>)}</ul>}
+      {revokeError && <p className="form-error revoke-error" role="alert">{revokeError}</p>}
+    </section>
   </main><SiteFooter />
   {accessModal && <OrganizerAccessModal fixedClub={club} onClose={() => setAccessModal(false)} onUnlocked={(unlocked) => { setSession(unlocked.session); setAccessModal(false); }} />}
   {awardModal && session && <AwardModal session={session} existing={{ id: event.id, name: event.name, role: event.role }} onClose={() => setAwardModal(false)} onChanged={load} />}

@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { Icon } from "@/components/Icon";
-import { Badge } from "@/components/Badge";
+import { CopyText } from "@/components/CopyText";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { AwardModal } from "../AwardModal";
@@ -22,7 +23,7 @@ const COUNT_POLL_MS = 8000;
 const WINDOW_S = 30;
 const ROSTER_POLL_MS = 4000;
 
-export default function CheckinView({ event, club }: { event: EventRecord | null; club: { id: string; name: string } }) {
+export default function CheckinView({ event, club, siteUrl }: { event: EventRecord | null; club: { id: string; name: string }; siteUrl?: string }) {
   // With email / Google sign-in on, attendees don't need Phantom, so the QR opens the claim page itself.
   const signInEnabled = useEmbeddedWallet().enabled;
   // The officer's sign-in. It must be for the club this event belongs to.
@@ -45,7 +46,10 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
   const [countBump, setCountBump] = useState(false);
   const prevAttendees = useRef<number | null>(null);
 
-  useEffect(() => { setOrigin(window.location.origin); }, []);
+  // The QR code points phones at PUBLIC_SITE_URL when it's set, otherwise at this page's own
+  // address. A phone can't open "localhost", so that case gets a warning instead of a dead QR.
+  useEffect(() => { setOrigin(siteUrl ?? window.location.origin); }, [siteUrl]);
+  const localOnly = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(origin);
 
   // Use the sign-in saved on the organizer page if it is for this event's club; otherwise ask.
   useEffect(() => {
@@ -162,6 +166,52 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
     }
   };
 
+  // Add someone who missed the scan: pick one of the club's members or paste a wallet. Mints the
+  // same attendance badge a scan would; the list then marks them "Added by officer".
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
+  const [members, setMembers] = useState<{ wallet: string; name: string }[] | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [addNote, setAddNote] = useState<{ ok: boolean; text: ReactNode } | null>(null);
+  useEffect(() => {
+    if (!addOpen || !session || members !== null) return;
+    fetch(`/api/clubs/${club.id}/members`, { headers: clubHeaders(session), cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { members: [] }))
+      .then((d: { members?: { wallet: string; name: string }[] }) => setMembers(d.members ?? []))
+      .catch(() => setMembers([]));
+  }, [addOpen, session, members, club.id]);
+  const here = new Set((roster ?? []).map((a) => a.wallet));
+  const q = addQuery.trim();
+  const looksLikeWallet = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(q);
+  const suggestions = !q || looksLikeWallet ? [] : (members ?? [])
+    .filter((m) => !here.has(m.wallet) && m.name.toLowerCase().includes(q.toLowerCase())).slice(0, 5);
+  const addPerson = async (wallet: string, label: string) => {
+    if (!event || !session || adding) return;
+    setAdding(wallet);
+    setAddNote(null);
+    try {
+      const res = await fetch(`/api/events/${event.id}/attendance`, {
+        method: "POST",
+        headers: { ...clubHeaders(session), "content-type": "application/json" },
+        body: JSON.stringify({ wallet }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.status === "awarded") { setAddNote({ ok: true, text: `${label} was added. Their badge is on Solana.` }); setAddQuery(""); }
+      else if (res.ok) setAddNote({ ok: true, text: `${label} already has this badge.` });
+      else if (data.error === "schema_not_ready") setAddNote({ ok: false, text: "Run db/06_manual_attendance.sql in Supabase first, then try again." });
+      else if (data.error === "organizer_unfunded") setAddNote({ ok: false, text: <>The organizer wallet needs devnet SOL. Fund <CopyText value={String(data.organizer)}/> at <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">faucet.solana.com</a>.</> });
+      else if (data.error === "invalid_wallet") setAddNote({ ok: false, text: "That isn’t a Solana wallet address." });
+      else if (res.status === 401) setAddNote({ ok: false, text: "Your officer sign-in has expired. Reload and enter the passcode again." });
+      else if (res.status === 409) setAddNote({ ok: false, text: "Already being added. Give it a few seconds." });
+      else setAddNote({ ok: false, text: "Couldn’t add them right now. Try again in a moment." });
+    } catch {
+      setAddNote({ ok: false, text: "Lost connection to the server. Try again in a moment." });
+    } finally {
+      setAdding(null);
+      setRosterTick((t) => t + 1);
+    }
+  };
+
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(tick);
@@ -219,38 +269,57 @@ export default function CheckinView({ event, club }: { event: EventRecord | null
   const qrValue = claimUrl ? (signInEnabled ? claimUrl : phantomBrowseLink(claimUrl, origin)) : "";
 
   return <><SiteHeader view="event" />
-  <main className="shell">
-    <Link className="back-link" href="/organizer">← All events</Link>
-    <div className="checkin-layout with-roster"><div><Badge>{club.name} · Check-in is open</Badge><h1>{event.name}<span className="green-period">.</span></h1><p className="lead">{formatDay(event.date)} · {formatTime(event.date)}{event.location && <><br/>{event.location}</>}</p><div className="instructions"><div><b>01</b><span>Scan the code<small>{signInEnabled ? "Use your phone camera. No app to install." : "Use your phone camera. It opens in Phantom."}</small></span></div><div><b>02</b><span>{signInEnabled ? "Sign in" : "Connect your wallet"}<small>{signInEnabled ? "Email or Google. Your attendance goes where you go." : "Your attendance goes where you go."}</small></span></div><div><b>03</b><span>Make it official<small>{event.mint ? "Tap Claim. Your organizer covers the fees." : "Confirm your check-in. There is no transaction fee."}</small></span></div></div>{attendees !== null && <div className={`live-attendees${countBump ? " count-bump" : ""}`}><Icon name="people" size={18}/><strong>{attendees === 0 ? "Waiting for the first check-in" : `${attendees} ${attendees === 1 ? "person" : "people"} showed up`}</strong></div>}<button type="button" className="button secondary present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button></div>
-      <div className={`qr-panel${urgency ? " " + urgency : ""}`}><div className="qr-title"><span className="brand mini"><span className="brand-mark">↗</span>ShowedUp</span><span className="quiet-pill">DEVNET</span></div><h2>You’re in the right place.</h2><p>Scan to claim your attendance.</p>
+  <main className="shell ci">
+    <div className="ci-head">
+      <div className="ci-title">
+        <Link className="ci-back" href="/organizer">← {club.name}</Link>
+        <h1>{event.name}</h1>
+        <p>{formatDay(event.date)} · {formatTime(event.date)}{event.location && <> · {event.location}</>}{event.mint && <> · <a href={explorerLink(event.mint)} target="_blank" rel="noreferrer">Badge on Solana <Icon name="external" size={13}/></a></>}</p>
+      </div>
+      {!event.mint && session && <button type="button" className="button secondary ci-present" onClick={() => setAwarding(true)}><Icon name="spark" size={15}/> Confirm a contribution</button>}
+      <button type="button" className="button primary ci-present present-open" onClick={startPresenting}>Present on a projector <Icon name="external" size={15}/></button>
+    </div>
+    <div className="ci-grid">
+      <section className={`ci-card ci-qr qr-panel${urgency ? " " + urgency : ""}`} aria-label="Check-in QR code">
+        <div className="ci-card-head"><span className="ci-live">Check-in is open</span><span className="ci-how">{signInEnabled ? "Scan with a phone camera · sign in · tap Claim" : "Scan with a phone camera · opens in Phantom · tap Claim"}</span></div>
         <div className="qr-wrap">{claimUrl
-          ? <QRCodeSVG value={qrValue} size={224} fgColor="#173d2d" level="M" marginSize={1}/>
+          ? <QRCodeSVG value={qrValue} size={260} fgColor="#0d1f78" level="M" marginSize={1}/>
           : <div style={{aspectRatio: "1", display: "grid", placeItems: "center"}}><p>{!checkedSaved || password ? "Loading code…" : "Club passcode needed to show the code."}</p></div>}</div>
-        <div className="code-line">CODE <strong>{code ?? "······"}</strong><span>Refreshes in {seconds}s</span></div>
+        <div className="code-line">CODE <strong>{code ?? "······"}</strong><span>{code ? `New code in ${seconds}s` : ""}</span></div>
         <div className="countdown-track"><div style={{width: `${seconds / WINDOW_S * 100}%`}}/></div>
         {codeError && <p className="form-error" role="alert">{codeError}</p>}
+        {localOnly && <p className="form-error" role="alert">Phones can’t open “localhost”, so this QR code won’t work on a phone. Open this page from the Vercel link (or a tunnel link), or set PUBLIC_SITE_URL on the server.</p>}
         {!password && checkedSaved
           ? <button className="text-link qr-link" onClick={() => { setAccessError(""); setAccessModal(true); }}>Enter club passcode <Icon name="arrow" size={16}/></button>
-          : claimUrl && <a href={claimUrl} target="_blank" rel="noreferrer" className="text-link qr-link">Open attendee screen <Icon name="arrow" size={16}/></a>}
-        <small className="qr-disclaimer">Each code works for up to a minute, then scan again.</small>
-      </div>
-      <aside className="roster-panel" aria-label="Who’s here"><div className="roster-head"><h2>Who’s here</h2>{roster && <span className="roster-count" aria-live="polite">{roster.length}</span>}</div>
+          : claimUrl && <a href={claimUrl} target="_blank" rel="noreferrer" className="text-link qr-link">Open the attendee screen <Icon name="arrow" size={16}/></a>}
+      </section>
+      <aside className="ci-card ci-roster roster-panel" aria-label="Who’s here">
+        <div className={`ci-count${countBump ? " count-bump" : ""}`} aria-live="polite"><strong>{attendees ?? "–"}</strong><span>{attendees === 1 ? "person showed up" : "people showed up"}</span></div>
+        <div className="roster-head"><h2>Who’s here</h2>{roster && <span className="roster-count">{roster.length}</span>}{session && <button type="button" className="ci-add-toggle" aria-expanded={addOpen} onClick={() => { setAddOpen(!addOpen); setAddNote(null); }}>{addOpen ? "Done" : "+ Add someone"}</button>}</div>
+        {addOpen && session && <div className="ci-add">
+          <input value={addQuery} onChange={(e) => setAddQuery(e.target.value)} placeholder="Search members or paste a wallet" aria-label="Search members or paste a wallet address" autoCapitalize="off" autoCorrect="off" spellCheck={false} autoFocus/>
+          {looksLikeWallet && <button type="button" className="ci-add-option" disabled={adding !== null} onClick={() => addPerson(q, `${q.slice(0, 4)}…${q.slice(-4)}`)}><span>Add wallet <code>{q.slice(0, 4)}…{q.slice(-4)}</code></span><b>{adding === q ? "Adding…" : here.has(q) ? "Already here" : "Add"}</b></button>}
+          {suggestions.map((m) => <button type="button" key={m.wallet} className="ci-add-option" disabled={adding !== null} onClick={() => addPerson(m.wallet, m.name)}><span>{m.name} <code>{m.wallet.slice(0, 4)}…{m.wallet.slice(-4)}</code></span><b>{adding === m.wallet ? "Adding…" : "Add"}</b></button>)}
+          {q && !looksLikeWallet && members !== null && suggestions.length === 0 && <p className="ci-add-hint">No member by that name. Paste their wallet address instead.</p>}
+          {!q && <p className="ci-add-hint">For someone who was here but missed the scan. Mints the same badge a scan would; your club covers the fee.</p>}
+          {addNote && <p className={addNote.ok ? "ci-add-ok" : "form-error"} role="status">{addNote.text}</p>}
+        </div>}
         <div className="roster-body">{roster === null
           ? <p className="roster-empty">{!checkedSaved || password ? "Loading names…" : "Enter the club passcode to see who’s here."}</p>
           : roster.length === 0
             ? <div className="roster-empty"><Icon name="people" size={22}/><p>Names show up here as people check in.</p></div>
-            : <ol className="roster-list">{roster.map((a) => <li key={a.wallet} className={revocable ? "has-revoke" : undefined}>{a.name}{revocable && <button type="button" className="text-link revoke-button" disabled={revoking !== null} onClick={() => revoke(a)}>{revoking === a.wallet ? "Revoking…" : "Revoke"}</button>}</li>)}</ol>}</div>
+            : <ol className="roster-list">{roster.map((a) => <li key={a.wallet} className={revocable ? "has-revoke" : undefined}>{a.name}{a.addedByOfficer && <span className="ci-added-tag">Added by officer</span>}{revocable && <button type="button" className="text-link revoke-button" disabled={revoking !== null} onClick={() => revoke(a)}>{revoking === a.wallet ? "Revoking…" : "Revoke"}</button>}</li>)}</ol>}</div>
         {revokeError && <p className="form-error revoke-error" role="alert">{revokeError}</p>}
-        {streamedCount > 0 && roster && <small className="qr-disclaimer" style={{margin: "10px 0 12px", padding: "0 24px", textAlign: "center"}}>{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
-      </aside></div>
-    {event.mint ? <div className="token-details"><Icon name="shield" size={17}/><span>Event token<small>{event.name} · Token-2022 · Nontransferable · 0 decimals</small></span><a className="pill-link" href={explorerLink(event.mint)} target="_blank" rel="noreferrer">View on Explorer <Icon name="external" size={14}/></a></div> : session && <button className="button secondary" onClick={() => setAwarding(true)}>Confirm a contribution</button>}
+        {streamedCount > 0 && roster && <small className="ci-stream">{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
+      </aside>
+    </div>
     {awarding && session && <AwardModal session={session} events={[event]} onClose={() => setAwarding(false)} onChanged={() => setRosterTick(t => t + 1)} />}
   </main><SiteFooter />
   {presenting && <div className={`present${urgency ? " " + urgency : ""}`} role="dialog" aria-modal="true" aria-label={`Check-in for ${event.name}, full screen`}>
     <button type="button" className="present-exit" onClick={() => setPresenting(false)}>Exit <kbd>Esc</kbd></button>
     <div className="present-qr">
       <div className="present-qr-box">{claimUrl
-        ? <QRCodeSVG value={qrValue} size={560} fgColor="#173d2d" level="M" marginSize={1}/>
+        ? <QRCodeSVG value={qrValue} size={560} fgColor="#0d1f78" level="M" marginSize={1}/>
         : <p>{!checkedSaved || password ? "Loading code…" : "Club passcode needed to show the code."}</p>}</div>
       <div className="present-code"><span>CODE</span><strong>{code ?? "······"}</strong></div>
       <div className="present-track"><div style={{width: `${seconds / WINDOW_S * 100}%`}}/></div>

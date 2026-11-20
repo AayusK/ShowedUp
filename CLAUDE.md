@@ -62,8 +62,8 @@ Full details: `SPEC.md`. Setup and operations: `README.md`.
 
 | Route | File | What it does |
 |---|---|---|
-| `/` | `app/page.tsx` → `app/HomeView.tsx` | Hero + the 3 most recent real events |
-| `/organizer` | `app/organizer/OrganizerView.tsx` | Password prompt, create event, event list with private check-in and legacy token counts |
+| `/` | `app/page.tsx` → `app/HomeView.tsx` | Short hero with a track record preview, live feed across clubs, open openings, "checking in today" banner |
+| `/organizer` | `app/organizer/OrganizerView.tsx` | Club dashboard behind the passcode: side rail with Overview, Events, Badges, Members, Openings, Activity, Clubs (admin) |
 | `/organizer/[id]` | `app/organizer/[id]/CheckinView.tsx` | Rotating QR (Phantom browse link), 30 s countdown, live "N people showed up", "Who’s here" names list |
 | `/claim/[eventId]?c=` | `app/claim/[eventId]/ClaimView.tsx` | Name (first claim per wallet) + sign message → claim; ready / success / already claimed / expired screens |
 | `/profile/[wallet]` | `app/profile/[wallet]/ProfileView.tsx` | Private check-ins, receipts, legacy badges and tier; `me`/`demo` = connected wallet |
@@ -72,8 +72,11 @@ Full details: `SPEC.md`. Setup and operations: `README.md`.
 | `/openings/[id]` | `app/openings/[id]/OpeningView.tsx` | Opening with a rule: check, apply with a wallet signature |
 
 Track-record routes (`app/api/`): `GET/POST clubs`, `PATCH clubs/[id]` (admin, verify), `POST events/[id]/award`,
-`POST events/[id]/revoke` (club passcode; burns as permanent delegate), `GET/POST openings`,
-`openings/[id]/{check,apply,applications}`, `GET feed` (live feed across clubs, no names).
+`POST events/[id]/revoke` (club passcode; burns as permanent delegate), `POST events/[id]/attendance`
+(club passcode; adds someone who missed the scan, marks `claims.added_by_officer`), `GET/POST openings`,
+`openings/[id]/{check,apply,applications}`, `GET feed` (live feed across clubs, no names),
+`GET clubs/[id]/roster` (club passcode; read-only: everyone holding a club badge, events attended
+and role badges, names only for self-check-ins; powers the dashboard's Members and Overview tabs).
 
 API routes (`app/api/`): `GET/POST events` (`?counts=1` adds attendee counts from the database or legacy mint supply),
 `GET events/[id]/code` (password), `GET events/[id]/attendees` (password; names), `POST claim` (saves the name),
@@ -92,7 +95,7 @@ run with `tsx --conditions=react-server` (already set in `package.json`).
 
 **Design reference:** the original visual demo (`app/demo.tsx`, deleted; it's in git history)
 set the look. Keep its look, copy and CSS class names (`app/globals.css`, plain CSS rather than
-Tailwind utilities). Don't redesign anything. Navigation links must be clearly visible (larger
+Tailwind utilities). **2026-11-18: the owner now allows a real visual and structural redesign (this replaces "Don't redesign anything"); still plain CSS in `globals.css`, one step at a time.** Navigation links must be clearly visible (larger
 and/or green): see the "Visible links" block at the end of `globals.css`. Files contain UTF-8
 characters like `·`, `→`, `↗`, `’`; keep the encoding intact.
 
@@ -169,6 +172,9 @@ Another optional variable: `PRIVY_APP_ID` turns on email / Google sign-in. It is
 design (not a secret); `app/layout.tsx` reads it on the server and passes it down, so it still
 isn't `NEXT_PUBLIC_*`. The server doesn't use `PRIVY_APP_SECRET`.
 
+Optional and not a secret: `PUBLIC_SITE_URL` (e.g. `https://showedup-phi.vercel.app`). When set,
+check-in QR codes always point there, even if the organizer page was opened at localhost.
+
 **This repository’s deployment.** `AayusK/ShowedUp` deploys to `aayusks-projects/showed-up`. At the receipt rollout, the local checkout and `showed-up.vercel.app` both used Supabase project `enzijcqcmlzeyhbizmov`. Test fixtures created locally can be visible on that site. The original club site at `showedup-phi.vercel.app` is a separate deployment.
 
 The organizer wallet (`8BdUdmWv4n1DaQMxfPUbVTTtNDd2NqcJz4r9BWkorexu`) needs devnet SOL: about
@@ -227,6 +233,19 @@ record page by club and term; Step 4 openings with a rule; Wave B: revocation (p
 burn + `claims.revoked_at`), `npm run fake-badge`, and the live feed across clubs (`/api/feed`).
 Schema: `db/01_clubs.sql` … `db/04_revocation.sql`, each safe to run twice.
 
+**Demo redesign (Nov 18–20, branch `claude/pensive-ritchie-gk73lm`, draft PR #5):** compact
+redesign of every page (frosted top bar with Club / Track record tabs; club dashboard with a
+glossy side rail, Events / Openings / Clubs tabs and a ··· menu per event; check-in page with QR
+and who's-here cards; one-page track record; shorter home page; restyled claim, verify,
+openings and pop-ups). Fixes: claim continues after connecting, no "connect" flash on
+`/profile/me`, tier progress bar, QR uses `PUBLIC_SITE_URL` (optional, not secret) and warns on
+localhost, creating an event opens its QR. New feature: officers add someone who missed the scan
+(`db/06_manual_attendance.sql`; officer-added wallets never count as members, so a pasted
+stranger's name stays hidden). Dashboard tabs: Overview (default: next event, term numbers, top
+members, latest activity), Events (with an attendance trend chart), Badges, Members, Openings,
+Activity (the club's slice of `/api/feed`), Clubs (registry admin). Team-lead logins were planned
+but held until after the demo (plan in the session notes, not in the repo).
+
 **Frontend polish in progress:** the full audit (33 numbered items, ⭐ priorities, owner's
 constraints, progress log) is in [`docs/UI-AUDIT.md`](docs/UI-AUDIT.md). Read it before any UI
 work. The owner picks which items to do; nothing from it is implemented until they say so, and
@@ -263,6 +282,20 @@ Possible next work (ask before starting any of it):
   to the same wallet (the claims row stays as the lock).
 - **Copy:** say "track record", never "background check". Records are positive only; no student
   name on-chain (club names are fine).
+- **Club sign-up (Nov 20, owner's OK):** anyone can create a club from the sign-in box
+  (`POST /api/clubs` without the admin password). It always starts unverified and can't create
+  events, award badges or add attendance (`club_not_verified`) until the registry admin verifies
+  it, so strangers can't spend the organizer wallet's SOL. Sign-ups pause at 50 pending clubs.
+- **Club chat (Nov 20, owner's OK):** officers chat with the club passcode (optional display label
+  via `x-chat-name`); members sign in once with a wallet signature at `/chat/[clubId]` and get a
+  7-day HMAC token (key = `"chat:" + EVENT_SECRET`, nothing stored), only if `clubMembers` lists
+  them. Every club has an "Everyone" group; only officers create, change or archive groups.
+  Members see names of people in their groups. Tables in `db/08_chat.sql`; routes under
+  `/api/chat/[clubId]`; UI in `components/ChatPanel.tsx`. Messages refresh by polling (4 s).
+- **Public profiles (Nov 20, owner's OK):** opt-in. A student's name, headline, school, bio, links
+  (LinkedIn shown as a button) and skills show on their track record only after they switch it
+  on. Stored in `profiles` (`db/07_profiles.sql`, RLS on, no policies); saving and reading a hidden
+  draft need a fresh wallet signature (`/api/profile-card/[wallet]`). Never on-chain.
 
 ## 8. Gotchas
 

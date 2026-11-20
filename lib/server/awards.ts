@@ -18,7 +18,7 @@ export type AwardResult =
  * The (event, wallet) row in `claims` is the lock, so a double click, or two server instances,
  * can't mint twice.
  */
-export async function awardBadge(event: EventRecord, club: ClubRecord, owner: PublicKey): Promise<AwardResult> {
+export async function awardBadge(event: EventRecord, club: ClubRecord, owner: PublicKey, opts: { addedByOfficer?: boolean } = {}): Promise<AwardResult> {
   if (!event.mint) throw new Error("A legacy badge needs a mint");
   const mint = new PublicKey(event.mint);
   const wallet = owner.toBase58();
@@ -29,7 +29,7 @@ export async function awardBadge(event: EventRecord, club: ClubRecord, owner: Pu
     return { status: "already_awarded" };
   }
 
-  const reservation = await reserveClaim(event.id, wallet);
+  const reservation = await reserveClaim(event.id, wallet, opts);
   if (reservation === "in_progress") return { status: "in_progress" };
   if (reservation === "confirmed") return { status: "already_awarded" };
 

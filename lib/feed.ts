@@ -41,3 +41,12 @@ export function timeAgo(iso: string, now: Date): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
   return `${Math.floor(seconds / 86400)} d ago`;
 }
+
+/**
+ * How to show any feed item in one line. Receipts carry no person or event on purpose (they're
+ * private); token badges show the role (or "Attended"), the event and a short wallet.
+ */
+export function feedText(item: FeedItem): { title: string; detail: string; isRole: boolean } {
+  if (item.kind === "receipt") return { title: "Contribution confirmed", detail: `${item.club} · signed receipt`, isRole: true };
+  return { title: item.role ?? "Attended", detail: `${item.eventName} · ${item.wallet}`, isRole: item.kind === "contribution" };
+}

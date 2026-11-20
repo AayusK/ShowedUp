@@ -9,8 +9,11 @@ const STALE_MS = 2 * 60_000; // a "pending" row older than this is from a reques
 
 export type Reservation = "reserved" | "confirmed" | "in_progress";
 
-export async function reserveClaim(eventId: string, wallet: string): Promise<Reservation> {
-  const { error } = await db().from("claims").insert({ event_id: eventId, wallet, status: "pending" });
+export async function reserveClaim(eventId: string, wallet: string, opts: { addedByOfficer?: boolean } = {}): Promise<Reservation> {
+  // An officer adding someone by hand marks the row before anything is minted, so the mark is
+  // never missing on a minted badge (see db/06_manual_attendance.sql).
+  const row = { event_id: eventId, wallet, status: "pending", ...(opts.addedByOfficer ? { added_by_officer: true } : {}) };
+  const { error } = await db().from("claims").insert(row);
   if (!error) return "reserved";
   if (error.code !== "23505") throw new Error(`claim reserve failed: ${error.message}`); // 23505 = already exists
 
@@ -43,6 +46,17 @@ export async function checkIn(eventId: string, wallet: string): Promise<"success
   if (!error) return "success";
   if (error.code === "23505") return "already_claimed";
   throw new Error(`check-in failed: ${error.message}`);
+}
+
+/**
+ * An officer adds someone who missed the scan to a private event: the same single insert as a
+ * check-in, flagged as added by an officer (db/06_manual_attendance.sql). Nothing goes on-chain.
+ */
+export async function officerCheckIn(eventId: string, wallet: string): Promise<"success" | "already_claimed"> {
+  const { error } = await db().from("claims").insert({ event_id: eventId, wallet, status: "confirmed", added_by_officer: true });
+  if (!error) return "success";
+  if (error.code === "23505") return "already_claimed";
+  throw new Error(`officer check-in failed: ${error.message}`);
 }
 
 /** Mark an already-held token as confirmed (e.g. claims from before the database existed). */
@@ -79,4 +93,12 @@ export async function markRevoked(eventId: string, wallet: string, addIfMissing 
   const { error: insertErr } = await db().from("claims")
     .insert({ event_id: eventId, wallet, status: "confirmed", revoked_at: revokedAt, updated_at: revokedAt });
   if (insertErr && insertErr.code !== "23505") console.error("[claims] revoke note failed:", insertErr.message.split("\n")[0]);
+}
+
+/** False until db/06_manual_attendance.sql has been run (no `added_by_officer` column yet). */
+export async function supportsOfficerAdds(): Promise<boolean> {
+  const { error } = await db().from("claims").select("added_by_officer").limit(1);
+  if (error && MISSING_COLUMN.has(error.code ?? "")) return false;
+  if (error) throw new Error(`claims read failed: ${error.message}`);
+  return true;
 }

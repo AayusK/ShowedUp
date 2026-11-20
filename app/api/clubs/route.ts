@@ -22,8 +22,13 @@ export async function GET() {
 
 // Registry admin only (ORGANIZER_PASSWORD): create a club. The club's Solana address is derived
 // from CLUB_KEY_SECRET and the new club id; no key is stored.
+// Creating a club. The registry admin (admin password) can create verified clubs. Anyone else can
+// sign a club up, but it always starts unverified: it can sign in and look around, and creating
+// events or badges (which spends the organizer wallet's SOL) unlocks once the admin verifies it.
+const MAX_PENDING_CLUBS = 50;
+
 export async function POST(request: Request) {
-  if (!isAdminAuthorized(request)) return error("unauthorized", 401);
+  const admin = isAdminAuthorized(request);
 
   let body: unknown;
   try {
@@ -39,7 +44,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const club = await createClub(cleanName, passcode, verified === true);
+    if (!admin) {
+      // A brake on spam sign-ups: stop taking new ones while too many wait for the admin.
+      const pending = (await readClubs()).filter((c) => !c.legacy && !c.verified).length;
+      if (pending >= MAX_PENDING_CLUBS) return error("too_many_pending", 429);
+    }
+    const club = await createClub(cleanName, passcode, admin && verified === true);
     return NextResponse.json({ club: clubInfo(club) }, { status: 201 });
   } catch (e) {
     if (e instanceof ClubNameTakenError) return error("name_taken", 409);

@@ -13,7 +13,9 @@ import { TrackRecordUnverified } from "@/components/TrackRecordUnverified";
 import { signedRead } from "@/lib/privateAccess";
 import { fetchProfile, type Profile, type ProfileResult } from "@/lib/profileClient";
 import { useEmbeddedWallet } from "@/lib/embeddedWallet";
-import { ProfileRecord } from "./ProfileRecord";
+import { ProfileRecord, RecordSummary } from "./ProfileRecord";
+import { ProfileCardEditor, ProfileCardHeader } from "./ProfileCardView";
+import type { ProfileCard } from "@/lib/profileCard";
 
 // "/profile/me" (and the older "/profile/demo" links) mean "whoever is connected".
 const SELF_ALIASES = new Set(["me", "demo"]);
@@ -51,8 +53,9 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
     return () => { cancelled = true; };
   }, [target]);
 
-  const shell = (body: ReactNode) => <><SiteHeader view="profile" /><main className="shell">{body}</main><SiteFooter /></>;
-  const message = (symbol: string, title: string, text: string, action?: ReactNode) => shell(<div className="center-page"><div className="claim-panel"><div className="large-symbol"><Icon name={symbol} size={32}/></div><h1>{title}</h1><p>{text}</p>{action}</div></div>);
+  const shell = (body: ReactNode, extra = "") => <><SiteHeader view="profile" /><main className={`shell${extra}`}>{body}</main><SiteFooter /></>;
+  // Sign-in, loading and error screens use the same card as the claim page.
+  const message = (symbol: string, title: string, text: string, action?: ReactNode) => shell(<div className="center-page"><div className="claim-panel"><div className="large-symbol"><Icon name={symbol} size={32}/></div><h1>{title}</h1><p>{text}</p>{action}</div></div>, " claim-v2");
 
   if (isSelfRoute && !connectedWallet && signInPending) {
     return message("spark", "One moment…", "Checking whether you’re signed in.");
@@ -64,7 +67,7 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
     return message("wallet", "Your presence, collected.", "Connect your wallet to see the events you’ve shown up to.", <><button className="button primary full" style={{marginTop: 25}} onClick={() => setVisible(true)}>Connect wallet <Icon name="wallet" size={17}/></button><Link className="text-link" href="/verify" style={{marginTop: 20}}>Or verify any wallet <Icon name="arrow" size={16}/></Link></>);
   }
   if (connectedWallet && target === connectedWallet) {
-    return shell(<OwnerRecord key={target} wallet={target} publicResult={result} sign={publicKey ? signMessage : embedded.signMessage} />);
+    return shell(<OwnerRecord key={target} wallet={target} publicResult={result} sign={publicKey ? signMessage : embedded.signMessage} />, " rec-page");
   }
   if (!result) {
     return message("spark", "Gathering the track record…", "Reading badges from Solana devnet.");
@@ -75,12 +78,33 @@ export default function ProfileView({ walletParam }: { walletParam: string }) {
   if (!result.ok) {
     return message("shield", "Couldn’t reach Solana devnet.", "Refresh in a moment to load this wallet’s public badges.");
   }
-  return shell(<RecordContent profile={result.profile} isMine={false} />);
+  return shell(<RecordContent profile={result.profile} isMine={false} />, " rec-page");
+}
+
+/**
+ * The opt-in profile card (name, school, About, LinkedIn…) above the record, loaded for whichever
+ * wallet is shown. Its owner can edit it; visitors see it only once it's switched on.
+ */
+function useProfileCard(wallet: string) {
+  const [card, setCard] = useState<{ wallet: string; card: ProfileCard | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/profile-card/${encodeURIComponent(wallet)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { card: null }))
+      .then((d: { card?: ProfileCard | null }) => { if (!cancelled) setCard({ wallet, card: d.card ?? null }); })
+      .catch(() => { if (!cancelled) setCard({ wallet, card: null }); });
+    return () => { cancelled = true; };
+  }, [wallet]);
+  return [card?.wallet === wallet ? card.card : null, (c: ProfileCard) => setCard({ wallet, card: c })] as const;
 }
 
 function RecordContent({ profile, isMine }: { profile: Profile; isMine: boolean }) {
+  const [card, setCard] = useProfileCard(profile.wallet);
+  const [editing, setEditing] = useState(false);
   return <>
+    <div className="pc-wrap"><ProfileCardHeader card={card} isMine={isMine} onEdit={() => setEditing(true)} summary={<RecordSummary profile={profile} />} /></div>
     <ProfileRecord profile={profile} isMine={isMine} />
+    {editing && isMine && <ProfileCardEditor wallet={profile.wallet} initial={card} onClose={() => setEditing(false)} onSaved={(c) => { setCard(c); setEditing(false); }} />}
     <TrackRecordUnverified badges={profile.unverified} total={profile.unverifiedTotal}/>
     <TrackRecordShare wallet={profile.wallet} isMine={isMine}/>
   </>;
@@ -105,7 +129,7 @@ function OwnerRecord({ wallet, publicResult, sign }: {
   }
   const profile = unlocked ?? (publicResult?.ok ? publicResult.profile : null);
   return <>
-    {(!unlocked || unlocked.partial) && <section className="panel">
+    {(!unlocked || unlocked.partial) && <section className="panel rec-unlock-private">
       <button className="button primary" onClick={unlock} disabled={busy || !sign}>
         {busy ? "Opening private record…" : unlocked ? "Refresh private record" : "View my private check-ins and receipts"}
       </button>

@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { getOpening } from "@/lib/server/openings";
 import type { OpeningInfo } from "@/lib/openings";
 import OpeningView from "./OpeningView";
+
+export const metadata: Metadata = { title: "Opening" };
 
 export const dynamic = "force-dynamic";
 

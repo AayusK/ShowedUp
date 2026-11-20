@@ -1,170 +1,187 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ReceiptDownload } from "@/components/ReceiptDownload";
 import { Icon } from "@/components/Icon";
 import { shortAddress, type Profile, type ProfileEvent } from "@/lib/profileClient";
 import { explorerLink } from "@/lib/solana";
-import { badgeDetail, groupTrackRecord, roleCounts } from "@/lib/trackRecord";
-
-const TABS = [
-  { id: "clubs", label: "Clubs", heading: "Clubs on this record" },
-  { id: "attendance", label: "Attendance", heading: "Attendance history" },
-  { id: "contributions", label: "Contributions", heading: "Contributions across clubs" },
-  { id: "by-club", label: "Attendance by club", heading: "Attendance by club" },
-] as const;
+import { CONTRIBUTION_ROLES } from "@/lib/badges";
+import { formatDay } from "@/lib/format";
+import { groupTrackRecord, roleCounts } from "@/lib/trackRecord";
+import { TIERS } from "@/lib/tiers";
 
 function eventCount(count: number) {
   return `${count} ${count === 1 ? "event" : "events"}`;
 }
 
-function BadgeRows({ events, showClub = true }: { events: ProfileEvent[]; showClub?: boolean }) {
+/**
+ * How far this wallet is along the tiers (1 = Showed Up, 3 = Regular, 5 = Core Member), as a
+ * bar with one stop per tier. Counts attendance only, like the tiers themselves.
+ */
+function TierProgress({ profile }: { profile: Profile }) {
+  const top = TIERS[TIERS.length - 1].min;
+  const fill = Math.min(profile.count, top) / top;
   return (
-    <ul className="profile-record-list">
-      {events.map((event) => {
-        const detail = [showClub && event.club.name, badgeDetail(event)].filter(Boolean).join(" · ");
-        return (
-          <li className="profile-record-row" key={event.id}>
-            <div className="profile-record-row-copy">
-              <strong>{event.name}</strong>
-              {detail && <p>{detail}{!event.club.verified && " · Unverified club"}</p>}
-              {event.receiptFile && <><p>{String(event.receiptFile.record.summary ?? "")}</p><ReceiptDownload file={event.receiptFile} /></>}
-            </div>
-            <span className="profile-record-status">{event.kind === "attendance" ? "Attended" : event.role}</span>
-            {(event.mint || event.receiptFile) && <a className="profile-record-proof" href={event.receiptFile ? explorerLink(event.receiptFile.receipt.signature, "tx") : explorerLink(event.mint!)} target="_blank" rel="noreferrer"
-              aria-label={`View proof for ${event.name} on Solana Explorer`}>
-              <Icon name="external" size={15} />
-            </a>}
-          </li>
-        );
-      })}
-    </ul>
+    <div className="profile-record-tier">
+      <div className="tier-progress-head">
+        <span>{eventCount(profile.count)} attended</span>
+        <span>{profile.nextTier ? `${eventCount(profile.nextTier.remaining)} to ${profile.nextTier.name}` : "Top tier reached"}</span>
+      </div>
+      <div className="tier-progress" role="progressbar" aria-valuemin={0} aria-valuemax={top} aria-valuenow={Math.min(profile.count, top)} aria-label={`${eventCount(profile.count)} attended`}>
+        <div className="tier-progress-fill" style={{ width: `${fill * 100}%` }} />
+        {TIERS.map((t) => <span key={t.name} className={`tier-progress-stop${profile.count >= t.min ? " reached" : ""}`} style={{ left: `${(t.min / top) * 100}%` }} />)}
+      </div>
+      <div className="tier-progress-labels">
+        {TIERS.map((t) => <span key={t.name} className={profile.count >= t.min ? "reached" : ""} style={{ left: `${(t.min / top) * 100}%` }}>{t.name}</span>)}
+      </div>
+    </div>
+  );
+}
+
+/** Where a badge can be checked on Solana: its receipt's transaction, or its token. Private
+ * check-ins have neither (they live in the club's private roster). */
+function proofLink(e: ProfileEvent): string | null {
+  if (e.receiptFile) return explorerLink(e.receiptFile.receipt.signature, "tx");
+  return e.mint ? explorerLink(e.mint) : null;
+}
+const badgeKey = (e: ProfileEvent) => `${e.id}:${e.role}:${e.mint ?? ""}`;
+
+/** A role pill in that role's colour: "Mentor", "Speaker", ... or "Attended" for attendance. */
+function RolePill({ event }: { event: ProfileEvent }) {
+  const role = event.kind === "attendance" ? "Attendee" : event.role;
+  return <span className={`rec-pill rec-role-${role}`}>{role === "Attendee" ? "Attended" : role}</span>;
+}
+
+function CopyWallet({ wallet }: { wallet: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  async function copy() {
+    try { await navigator.clipboard.writeText(wallet); } catch { return; }
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 2000);
+  }
+  return <button type="button" className="rec-copy" onClick={copy} aria-label="Copy wallet address">{copied ? <><Icon name="check" size={13} /> Copied</> : "Copy"}</button>;
+}
+
+/**
+ * "Regular unlocked": shown once, on your own record, the first time this browser sees you at a
+ * new tier. Remembered in this browser only (a convenience; nothing is saved on the server).
+ */
+function useTierUnlock(wallet: string, tier: string | null, isMine: boolean): string | null {
+  const [unlocked, setUnlocked] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isMine || !tier) return;
+    const key = `showedup-tier-seen:${wallet}`;
+    let seen: string | null = null;
+    try { seen = localStorage.getItem(key); } catch { return; }
+    // The very first visit just records the tier: no banner for a tier you already had.
+    if (seen !== null && seen !== tier) setUnlocked(tier);
+    try { localStorage.setItem(key, tier); } catch {}
+  }, [wallet, tier, isMine]);
+  return unlocked;
+}
+
+/**
+ * The track record in one strip, shown inside the profile header: tier, wallet, a slim progress
+ * bar toward the next tier, and the counts. Replaces the big blue tier card.
+ */
+export function RecordSummary({ profile }: { profile: Profile }) {
+  const clubs = new Set(profile.events.map((e) => e.club.id)).size;
+  return (
+    <div className="rs">
+      <div className="rs-top">
+        <span className="rs-tier">{profile.tier ?? "No tier yet"}</span>
+        <span className="rs-verified"><Icon name="shield" size={13} /> Verified on Solana</span>
+        <span className="rs-wallet">
+          <a href={explorerLink(profile.wallet)} target="_blank" rel="noreferrer" aria-label={`View wallet ${profile.wallet} on Solana Explorer`}>{shortAddress(profile.wallet)} <Icon name="external" size={12} /></a>
+          <CopyWallet wallet={profile.wallet} />
+        </span>
+      </div>
+      <TierProgress profile={profile} />
+      <div className="rs-stats">
+        <span><strong>{profile.count}</strong> {profile.count === 1 ? "event" : "events"}</span>
+        <span><strong>{profile.contributions}</strong> {profile.contributions === 1 ? "contribution" : "contributions"}</span>
+        <span><strong>{clubs}</strong> {clubs === 1 ? "club" : "clubs"}</span>
+      </div>
+    </div>
   );
 }
 
 export function ProfileRecord({ profile, isMine }: { profile: Profile; isMine: boolean }) {
-  const [selected, setSelected] = useState(0);
-  const tab = TABS[selected];
+  const unlocked = useTierUnlock(profile.wallet, profile.tier, isMine);
   const clubs = groupTrackRecord(profile.events);
-  const attendance = profile.events.filter((event) => event.kind === "attendance");
-  const contributions = profile.events.filter((event) => event.kind === "contribution");
-  const attendanceByClub = groupTrackRecord(attendance);
-  const hasRecords = tab.id === "clubs" ? clubs.length > 0
-    : tab.id === "contributions" ? contributions.length > 0 : attendance.length > 0;
-  const wallet = shortAddress(profile.wallet);
-
-  function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    let next: number;
-    switch (event.key) {
-      case "ArrowLeft": next = (index + TABS.length - 1) % TABS.length; break;
-      case "ArrowRight": next = (index + 1) % TABS.length; break;
-      case "Home": next = 0; break;
-      case "End": next = TABS.length - 1; break;
-      default: return;
-    }
-    event.preventDefault();
-    setSelected(next);
-    event.currentTarget.parentElement?.querySelectorAll("button")[next]?.focus();
-  }
+  const contributions = profile.events
+    .filter((e) => e.kind === "contribution")
+    .sort((a, b) => b.date.localeCompare(a.date));
+  // "2 × Mentor · 1 × Speaker", in the fixed role order.
+  const roleTotals = CONTRIBUTION_ROLES
+    .map((role) => ({ role, n: contributions.filter((e) => e.role === role).length }))
+    .filter((r) => r.n > 0);
 
   return (
-    <div className="profile-record">
-      <header className="profile-record-identity">
-        <div className="profile-record-cover" aria-hidden="true" />
-        <div className="profile-record-person">
-          <span className="profile-record-avatar" aria-hidden="true"><Icon name="wallet" size={23} /></span>
-          <div className="profile-record-name">
-            <h1>{isMine ? "Your track record" : "Track record"}</h1>
-            <a href={explorerLink(profile.wallet)} target="_blank" rel="noreferrer"
-              aria-label={`View wallet ${profile.wallet} on Solana Explorer`}>
-              {wallet} <Icon name="external" size={13} />
-            </a>
+    <div className="rec">
+      {unlocked && <p className="rec-unlock" role="status"><Icon name="spark" size={18}/><span><strong>{unlocked} unlocked.</strong> Keep showing up.</span></p>}
+
+      {profile.partial && <p className="rec-notice" role="status">Some badges may be missing right now. Refresh to try again.</p>}
+
+      {contributions.length > 0 && (
+        <section className="rec-section">
+          <div className="rec-section-head">
+            <h2>Contributions</h2>
+            <div className="rec-totals">{roleTotals.map(({ role, n }) => <span key={role} className={`rec-pill rec-role-${role}`}>{n} × {role}</span>)}</div>
           </div>
-          <Link className="profile-record-verify" href="/verify"><Icon name="shield" size={15} /> Verify a wallet</Link>
-        </div>
-      </header>
-      <div className="profile-record-tabs" role="tablist" aria-label="Track record sections">
-        {TABS.map((item, index) => (
-          <button type="button" role="tab" key={item.id} id={`profile-tab-${item.id}`}
-            aria-controls={`profile-panel-${item.id}`} aria-selected={index === selected}
-            tabIndex={index === selected ? 0 : -1} onClick={() => setSelected(index)}
-            onKeyDown={(event) => moveTab(event, index)}>
-            {item.label}
-          </button>
-        ))}
-      </div>
-      {profile.partial && <p className="profile-record-notice" role="status">Some badges may be missing. Refresh to try again.</p>}
-      {TABS.map((item, index) => (
-        <section className="profile-record-card" key={item.id} id={`profile-panel-${item.id}`}
-          role="tabpanel" aria-labelledby={`profile-tab-${item.id}`} tabIndex={0} hidden={index !== selected}>
-          {index === selected && <>
-            <header className="profile-record-card-head"><h2>{item.heading}</h2></header>
-            {!hasRecords && <p className="profile-record-notice">{
-              item.id === "clubs" ? "No verified club badges yet."
-                : item.id === "contributions" ? "No verified contributions yet."
-                  : "No verified attendance yet."
-            }</p>}
-            {item.id === "clubs" && clubs.length > 0 && (
-              <ul className="profile-record-list">
-                {clubs.map(({ club, terms }) => (
-                  <li className="profile-record-row" key={club.id}>
-                    <span className="profile-record-club-mark" aria-hidden="true">{Array.from(club.name)[0]?.toUpperCase()}</span>
-                    <div className="profile-record-row-copy">
-                      <strong>{club.name}</strong>
-                      <p>{roleCounts(terms.flatMap((term) => term.events)).join(" · ")}</p>
-                    </div>
-                    <a className="profile-record-proof" href={explorerLink(club.issuer)} target="_blank" rel="noreferrer"
-                      aria-label={`View ${club.name}’s issuer on Solana Explorer`}>
-                      <Icon name="external" size={15} />
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {item.id === "attendance" && attendance.length > 0 && <BadgeRows events={attendance} />}
-            {item.id === "contributions" && groupTrackRecord(contributions).map(({ club, terms }) => (
-              <div key={club.id}>{terms.map(term => <div key={term.label} className="profile-record-term">
-                <h3>{club.name} · {term.label}</h3><BadgeRows events={term.events} showClub={false}/>
-              </div>)}</div>
+          <ul className="rec-contribs">
+            {contributions.map((e) => (
+              <li key={badgeKey(e)} className={`rec-contrib rec-edge-${e.role}`}>
+                <RolePill event={e} />
+                <strong>{e.name}</strong>
+                <span>{e.club.name} · {formatDay(e.date)}</span>
+                {e.receiptFile && <><p className="rec-summary">{String(e.receiptFile.record.summary ?? "")}</p><ReceiptDownload file={e.receiptFile} /></>}
+                {proofLink(e) && <a href={proofLink(e)!} target="_blank" rel="noreferrer" aria-label={`View ${e.name} on Solana Explorer`}>Solana <Icon name="external" size={12} /></a>}
+              </li>
             ))}
-            {item.id === "by-club" && attendanceByClub.map(({ club, terms }, clubIndex) => (
-              <details className="profile-record-group" key={club.id} open={clubIndex === 0}>
-                <summary>
-                  <strong>{club.name}</strong>
-                  <span>{eventCount(terms.reduce((count, term) => count + term.events.length, 0))}</span>
-                </summary>
-                {terms.map((term) => (
-                  <div className="profile-record-term" key={term.label}>
-                    <h3>{term.label}</h3>
-                    <BadgeRows events={term.events} showClub={false} />
-                  </div>
-                ))}
-              </details>
-            ))}
-          </>}
+          </ul>
         </section>
-      ))}
-      {(profile.tier || profile.nextTier) && (
-        <div className="profile-record-tier">
-          {profile.tier && <strong>{profile.tier}</strong>}
-          {profile.nextTier && <span>{eventCount(profile.nextTier.remaining)} to {profile.nextTier.name}</span>}
-          <TierProgress nextTier={profile.nextTier} />
-        </div>
       )}
+
+      <section className="rec-section">
+        <div className="rec-section-head"><h2>Clubs</h2></div>
+        {clubs.length === 0 && <p className="rec-notice">No verified badges yet. Scan a club’s check-in QR code to get your first one.</p>}
+        {clubs.map(({ club, terms }) => (
+          <div className="rec-club" key={club.id}>
+            <div className="rec-club-head">
+              <span className="rec-club-mark" aria-hidden="true">{Array.from(club.name)[0]?.toUpperCase()}</span>
+              <div>
+                <strong>{club.name}</strong>
+                <span>{roleCounts(terms.flatMap((t) => t.events)).join(" · ")}</span>
+              </div>
+              {isMine && <Link className="rec-chat" href={`/chat/${club.id}`}><Icon name="chat" size={13} /> Club chat</Link>}
+              <a href={explorerLink(club.issuer)} target="_blank" rel="noreferrer" aria-label={`View ${club.name}’s issuer wallet on Solana Explorer`}>Issuer <Icon name="external" size={12} /></a>
+            </div>
+            {terms.map((term) => (
+              <div className="rec-term" key={term.label}>
+                <h3>{term.label}</h3>
+                <ul>
+                  {term.events.map((e) => (
+                    <li key={badgeKey(e)}>
+                      <RolePill event={e} />
+                      <strong>{e.name}</strong>
+                      <span className="rec-date">{formatDay(e.date)}</span>
+                      {proofLink(e) ? <a href={proofLink(e)!} target="_blank" rel="noreferrer" aria-label={`View ${e.name} on Solana Explorer`}><Icon name="external" size={14} /></a> : <span className="rec-private" title="Private check-in, kept in the club's roster">Private</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ))}
+      </section>
+
+      <p className="rec-verify"><Link href="/verify"><Icon name="shield" size={14} /> Look up another wallet</Link></p>
     </div>
   );
 }
 
-/** A thin bar that fills toward the next tier (full once the top tier is reached). */
-function TierProgress({ nextTier }: { nextTier: { name: string; min: number; remaining: number } | null }) {
-  const attended = nextTier ? nextTier.min - nextTier.remaining : 1;
-  const goal = nextTier ? nextTier.min : 1;
-  const percent = Math.max(0, Math.min(100, Math.round((attended / goal) * 100)));
-  return (
-    <div className="profile-record-tier-track" role="progressbar" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={attended}
-      aria-label={nextTier ? `${attended} of ${goal} events toward ${nextTier.name}` : "Top tier reached"}>
-      <div style={{ width: `${percent}%` }} />
-    </div>
-  );
-}
