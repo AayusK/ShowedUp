@@ -59,7 +59,7 @@ export function TrackRecordShare({ wallet, isMine }: { wallet: string; isMine: b
         </div>
       </div>
       <div className="qr-wrap tr-qr">{url
-        ? <QRCodeSVG value={url} size={160} fgColor="#173d2d" level="M" marginSize={1} title="QR code linking to this track record"/>
+        ? <QRCodeSVG value={url} size={160} fgColor="#0d1f78" level="M" marginSize={1} title="QR code linking to this track record"/>
         : <div style={{aspectRatio: "1"}}/>}</div>
     </section>
   );

@@ -280,7 +280,7 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
       <section className={`ci-card ci-qr qr-panel${urgency ? " " + urgency : ""}`} aria-label="Check-in QR code">
         <div className="ci-card-head"><span className="ci-live">Check-in is open</span><span className="ci-how">{signInEnabled ? "Scan with a phone camera · sign in · tap Claim" : "Scan with a phone camera · opens in Phantom · tap Claim"}</span></div>
         <div className="qr-wrap">{claimUrl
-          ? <QRCodeSVG value={qrValue} size={260} fgColor="#173d2d" level="M" marginSize={1}/>
+          ? <QRCodeSVG value={qrValue} size={260} fgColor="#0d1f78" level="M" marginSize={1}/>
           : <div style={{aspectRatio: "1", display: "grid", placeItems: "center"}}><p>{!checkedSaved || password ? "Loading code…" : "Club passcode needed to show the code."}</p></div>}</div>
         <div className="code-line">CODE <strong>{code ?? "······"}</strong><span>{code ? `New code in ${seconds}s` : ""}</span></div>
         <div className="countdown-track"><div style={{width: `${seconds / WINDOW_S * 100}%`}}/></div>
@@ -315,7 +315,7 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
     <button type="button" className="present-exit" onClick={() => setPresenting(false)}>Exit <kbd>Esc</kbd></button>
     <div className="present-qr">
       <div className="present-qr-box">{claimUrl
-        ? <QRCodeSVG value={qrValue} size={560} fgColor="#173d2d" level="M" marginSize={1}/>
+        ? <QRCodeSVG value={qrValue} size={560} fgColor="#0d1f78" level="M" marginSize={1}/>
         : <p>{!checkedSaved || password ? "Loading code…" : "Club passcode needed to show the code."}</p>}</div>
       <div className="present-code"><span>CODE</span><strong>{code ?? "······"}</strong></div>
       <div className="present-track"><div style={{width: `${seconds / WINDOW_S * 100}%`}}/></div>
