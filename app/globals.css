@@ -850,3 +850,13 @@ body{font-family:var(--font-geist-sans),ui-sans-serif,system-ui,-apple-system,"S
 .footer .brand-mark{background:linear-gradient(140deg,#5d87ff,#1733b0)}
 .footer .brand{color:var(--ink-2)}
 .large-symbol{background:var(--blue-soft);color:var(--blue);border-color:#dbe4ff}
+/* Present mode (projector) in the blue palette. */
+.green-period{color:var(--blue)}
+.present-code strong{color:var(--ink)}
+.present-code span{color:var(--sub)}
+.present-track{background:#e3e8f5}
+.present-track>div{background:var(--blue)}
+.present-names li{background:var(--blue-soft);color:#1733b0}
+.present-refresh{color:var(--sub)}
+.present-exit kbd{background:#f1f2f5;color:var(--sub)}
+.present-qr-box{border-color:var(--hair)}
