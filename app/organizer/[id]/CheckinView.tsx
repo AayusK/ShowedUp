@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { Icon } from "@/components/Icon";
@@ -162,6 +163,52 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
     }
   };
 
+  // Add someone who missed the scan: pick one of the club's members or paste a wallet. Mints the
+  // same attendance badge a scan would; the list then marks them "Added by officer".
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
+  const [members, setMembers] = useState<{ wallet: string; name: string }[] | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [addNote, setAddNote] = useState<{ ok: boolean; text: ReactNode } | null>(null);
+  useEffect(() => {
+    if (!addOpen || !session || members !== null) return;
+    fetch(`/api/clubs/${club.id}/members`, { headers: clubHeaders(session), cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { members: [] }))
+      .then((d: { members?: { wallet: string; name: string }[] }) => setMembers(d.members ?? []))
+      .catch(() => setMembers([]));
+  }, [addOpen, session, members, club.id]);
+  const here = new Set((roster ?? []).map((a) => a.wallet));
+  const q = addQuery.trim();
+  const looksLikeWallet = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(q);
+  const suggestions = !q || looksLikeWallet ? [] : (members ?? [])
+    .filter((m) => !here.has(m.wallet) && m.name.toLowerCase().includes(q.toLowerCase())).slice(0, 5);
+  const addPerson = async (wallet: string, label: string) => {
+    if (!event || !session || adding) return;
+    setAdding(wallet);
+    setAddNote(null);
+    try {
+      const res = await fetch(`/api/events/${event.id}/attendance`, {
+        method: "POST",
+        headers: { ...clubHeaders(session), "content-type": "application/json" },
+        body: JSON.stringify({ wallet }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.status === "awarded") { setAddNote({ ok: true, text: `${label} was added. Their badge is on Solana.` }); setAddQuery(""); }
+      else if (res.ok) setAddNote({ ok: true, text: `${label} already has this badge.` });
+      else if (data.error === "schema_not_ready") setAddNote({ ok: false, text: "Run db/05_manual_attendance.sql in Supabase first, then try again." });
+      else if (data.error === "organizer_unfunded") setAddNote({ ok: false, text: <>The organizer wallet needs devnet SOL. Fund <strong>{data.organizer}</strong> at faucet.solana.com.</> });
+      else if (data.error === "invalid_wallet") setAddNote({ ok: false, text: "That isn’t a Solana wallet address." });
+      else if (res.status === 401) setAddNote({ ok: false, text: "Your officer sign-in has expired. Reload and enter the passcode again." });
+      else if (res.status === 409) setAddNote({ ok: false, text: "Already being added. Give it a few seconds." });
+      else setAddNote({ ok: false, text: "Couldn’t add them right now. Try again in a moment." });
+    } catch {
+      setAddNote({ ok: false, text: "Lost connection to the server. Try again in a moment." });
+    } finally {
+      setAdding(null);
+      setRosterTick((t) => t + 1);
+    }
+  };
+
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(tick);
@@ -244,12 +291,20 @@ export default function CheckinView({ event, club, siteUrl }: { event: EventReco
       </section>
       <aside className="ci-card ci-roster roster-panel" aria-label="Who’s here">
         <div className={`ci-count${countBump ? " count-bump" : ""}`} aria-live="polite"><strong>{attendees ?? "–"}</strong><span>{attendees === 1 ? "person showed up" : "people showed up"}</span></div>
-        <div className="roster-head"><h2>Who’s here</h2>{roster && <span className="roster-count">{roster.length}</span>}</div>
+        <div className="roster-head"><h2>Who’s here</h2>{roster && <span className="roster-count">{roster.length}</span>}{session && <button type="button" className="ci-add-toggle" aria-expanded={addOpen} onClick={() => { setAddOpen(!addOpen); setAddNote(null); }}>{addOpen ? "Done" : "+ Add someone"}</button>}</div>
+        {addOpen && session && <div className="ci-add">
+          <input value={addQuery} onChange={(e) => setAddQuery(e.target.value)} placeholder="Search members or paste a wallet" aria-label="Search members or paste a wallet address" autoCapitalize="off" autoCorrect="off" spellCheck={false} autoFocus/>
+          {looksLikeWallet && <button type="button" className="ci-add-option" disabled={adding !== null} onClick={() => addPerson(q, `${q.slice(0, 4)}…${q.slice(-4)}`)}><span>Add wallet <code>{q.slice(0, 4)}…{q.slice(-4)}</code></span><b>{adding === q ? "Adding…" : here.has(q) ? "Already here" : "Add"}</b></button>}
+          {suggestions.map((m) => <button type="button" key={m.wallet} className="ci-add-option" disabled={adding !== null} onClick={() => addPerson(m.wallet, m.name)}><span>{m.name} <code>{m.wallet.slice(0, 4)}…{m.wallet.slice(-4)}</code></span><b>{adding === m.wallet ? "Adding…" : "Add"}</b></button>)}
+          {q && !looksLikeWallet && members !== null && suggestions.length === 0 && <p className="ci-add-hint">No member by that name. Paste their wallet address instead.</p>}
+          {!q && <p className="ci-add-hint">For someone who was here but missed the scan. Mints the same badge a scan would; your club covers the fee.</p>}
+          {addNote && <p className={addNote.ok ? "ci-add-ok" : "form-error"} role="status">{addNote.text}</p>}
+        </div>}
         <div className="roster-body">{roster === null
           ? <p className="roster-empty">{!checkedSaved || password ? "Loading names…" : "Enter the club passcode to see who’s here."}</p>
           : roster.length === 0
             ? <div className="roster-empty"><Icon name="people" size={22}/><p>Names show up here as people check in.</p></div>
-            : <ol className="roster-list">{roster.map((a) => <li key={a.wallet} className={revocable ? "has-revoke" : undefined}>{a.name}{revocable && <button type="button" className="text-link revoke-button" disabled={revoking !== null} onClick={() => revoke(a)}>{revoking === a.wallet ? "Revoking…" : "Revoke"}</button>}</li>)}</ol>}</div>
+            : <ol className="roster-list">{roster.map((a) => <li key={a.wallet} className={revocable ? "has-revoke" : undefined}>{a.name}{a.addedByOfficer && <span className="ci-added-tag">Added by officer</span>}{revocable && <button type="button" className="text-link revoke-button" disabled={revoking !== null} onClick={() => revoke(a)}>{revoking === a.wallet ? "Revoking…" : "Revoke"}</button>}</li>)}</ol>}</div>
         {revokeError && <p className="form-error revoke-error" role="alert">{revokeError}</p>}
         {streamedCount > 0 && roster && <small className="ci-stream">{streamedCount} of {roster.length} seen live on Solana · QuickNode Streams</small>}
       </aside>

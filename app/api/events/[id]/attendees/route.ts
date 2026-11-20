@@ -31,9 +31,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     let attendees = listed;
     // A contribution badge can be given to any pasted address. Show a saved name only for people
     // who checked in to one of this club's events; everyone else is a shortened wallet.
-    if (event?.kind === "contribution") {
+    // The same goes for someone an officer added to attendance by pasting their wallet.
+    if (event?.kind === "contribution" || attendees.some((a) => a.addedByOfficer)) {
       const members = new Set((await clubMembers(await readEvents(club.id))).map((m) => m.wallet));
-      attendees = attendees.map((a) => (members.has(a.wallet) ? a : { ...a, name: `${a.wallet.slice(0, 4)}…${a.wallet.slice(-4)}` }));
+      const masked = (a: (typeof attendees)[number]) => (members.has(a.wallet) ? a : { ...a, name: `${a.wallet.slice(0, 4)}…${a.wallet.slice(-4)}` });
+      attendees = attendees.map((a) => (event?.kind === "contribution" || a.addedByOfficer ? masked(a) : a));
     }
     return NextResponse.json({ attendees, revocable }, { headers: { "cache-control": "no-store" } });
   } catch (e) {

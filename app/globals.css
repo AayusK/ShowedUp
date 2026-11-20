@@ -583,3 +583,16 @@ body:has(.profile-record) { background: #f7f8fa; }
 .claim-v2 .text-link{font-size:13px;font-weight:600;color:var(--green)}
 .claim-v2 .tx-link{font-size:13px}
 .claim-v2 .soulbound-note{font-size:12.5px;color:#7a847c}
+
+/* Check-in: add someone who missed the scan (2026-11-20). */
+.ci-add-toggle{margin-left:auto;background:#e3f3eb;color:#127a55;font-size:13px;font-weight:600;border-radius:999px;padding:6px 12px;min-height:32px}
+.ci-roster .roster-head{display:flex;align-items:center;gap:8px}
+.ci-add{padding:0 22px 14px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #eef0ed}
+.ci-add input{width:100%;font-size:15px;padding:11px 12px;border:1px solid #dfe5d8;border-radius:10px;background:#fff}
+.ci-add-option{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:#f6f9f6;border-radius:10px;padding:9px 12px;font-size:14px;color:#141a16;min-height:44px}
+.ci-add-option:hover:not(:disabled){background:#eaf4ee}
+.ci-add-option code{font-size:12px;color:#7a847c;margin-left:6px}
+.ci-add-option b{color:#127a55;font-size:13px}
+.ci-add-hint{font-size:13px;color:#5f6862;line-height:1.5}
+.ci-add-ok{font-size:13px;color:#127a55;font-weight:600}
+.ci-added-tag{margin:0 auto 0 8px;font-size:11.5px;font-weight:600;color:#3f4b57;background:#eceff2;border-radius:999px;padding:2px 8px;vertical-align:middle}
