@@ -12,7 +12,8 @@
     "seed": "tsx --conditions=react-server scripts/seed.ts",
     "fake-badge": "tsx --conditions=react-server scripts/fake-badge.ts",
     "receipt:demo": "tsx --conditions=react-server scripts/receipt-demo.ts",
-    "receipt:verify": "tsx scripts/verify-receipt.ts"
+    "receipt:verify": "tsx scripts/verify-receipt.ts",
+    "demo:world": "tsx --conditions=react-server scripts/demo-world.ts"
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.51.4",
