@@ -3,11 +3,9 @@
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { Icon } from "@/components/Icon";
-import { Badge } from "@/components/Badge";
-import { AttendanceCard } from "@/components/AttendanceCard";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { dateTile, formatEventDetail, isToday } from "@/lib/format";
+import { formatEventDetail, isToday } from "@/lib/format";
 import { explorerLink } from "@/lib/solana";
 import { formatClosingDay, ruleSentence, type OpeningInfo } from "@/lib/openings";
 import { timeAgo, type FeedItem, type FeedResponse } from "@/lib/feed";
@@ -70,21 +68,56 @@ export default function HomeView({ events, openings = [] }: { events: HomeEvent[
   const feed = useLiveFeed();
   useEffect(() => { setClientNow(new Date()); }, []);
 
-  // Build a date string for "past/coming up" comparisons — only after mount.
-  const todayStr = clientNow
-    ? `${clientNow.getFullYear()}-${String(clientNow.getMonth() + 1).padStart(2, "0")}-${String(clientNow.getDate()).padStart(2, "0")}`
-    : null;
 
   // Newest first; the three most recent events.
   const recent = [...events].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
 
+  // An event happening today gets a small banner (worked out in the browser, in local time).
+  const todayEvent = clientNow ? recent.find((e) => isToday(e.date, clientNow)) : undefined;
+
   return <><SiteHeader view="home" />
-  <main className="shell">
-    <section className="hero"><div className="hero-copy"><Badge>Small moments. Lasting proof.</Badge><h1>Every time you<br/>show up.<br/><span>It adds up.</span></h1><p>Your time matters. Turn every club meeting into a little proof of belonging. Yours to keep, wherever you go.</p><div className="actions"><Link className="button primary" href="/profile/me">View my track record <Icon name="arrow" size={17}/></Link><Link className="text-link" href="/organizer">Host an event <Icon name="arrow" size={16}/></Link></div><div className="hero-note"><span>Good people. Real connections.<br/><strong>One meeting at a time.</strong></span></div></div><div className="hero-art"><div className="back-card back-one"/><div className="back-card back-two"/><AttendanceCard/><div className="floating-note"><span className="note-check"><Icon name="check" size={16}/></span><div>Another meeting. Another milestone.<small>Your fifth event unlocked Core Member.</small></div></div><span className="art-caption"><Icon name="shield" size={13}/> Yours to keep. Never to trade.</span></div></section>
-    <section className="benefit-strip"><div><Icon name="shield"/><span>Proof that stays with you<small>Attendance you own, in your wallet.</small></span></div><div><Icon name="wallet"/><span>Just bring yourself<small>No fees. No SOL needed.</small></span></div><div><Icon name="spark"/><span>Consistency opens doors<small>Show up. Unlock your next chapter.</small></span></div></section>
-    {recent.length > 0 && <section className="events-section"><div className="section-heading"><div><span className="eyebrow">YOUR COMMUNITY, IN MOTION</span><h2>Make your next appearance.</h2></div><Link className="text-link" href="/profile/me">View my track record <Icon name="arrow" size={16}/></Link></div><div className="event-grid">{recent.map((e, i) => { const tile = dateTile(e.date); const today = clientNow ? isToday(e.date, clientNow) : false; const isPast = todayStr !== null && e.date.slice(0, 10) < todayStr; return <a href={explorerLink(e.mint)} target="_blank" rel="noreferrer" className="event-card" key={e.id} style={{"--card-i": i} as React.CSSProperties}><div className="event-card-top"><div className="date-tile"><small>{tile.month}</small>{tile.day}</div>{today ? <Badge>Checking in today</Badge> : <span className="quiet-pill"><Icon name="calendar" size={12}/> {isPast ? "Past event" : "Coming up"}</span>}</div><h3>{e.name}</h3><p>{today ? "Scan the QR code in the room to check in." : "Each attendee holds one nontransferable token."}</p><div className="event-card-bottom"><span>{formatEventDetail(e.date, e.location, clientNow ?? undefined)}</span><span className="event-card-proof">View token <Icon name="external" size={15}/></span></div></a>; })}</div></section>}
-    <section className="events-section live-feed"><div className="section-heading"><div><span className="eyebrow">SEEN ON SOLANA · QUICKNODE STREAMS</span><h2>Live across clubs.</h2></div><Link className="text-link" href="/profile/me">View my track record <Icon name="arrow" size={16}/></Link></div>{feed && feed.items.length > 0 ? <ul className="panel live-feed-list">{feed.items.map((item) => <li className="live-feed-row" key={item.signature}><span className="history-check"><Icon name={item.kind === "contribution" ? "spark" : "check"} size={16}/></span><div className="live-feed-info"><strong>{item.role ?? "Attendance"} <span>· {item.club}</span></strong><small>{item.eventName} · {item.wallet}</small></div><div className="live-feed-meta"><small>{timeAgo(item.at, feed.now)}</small><a className="text-link" href={explorerLink(item.signature, "tx")} target="_blank" rel="noreferrer">View on Solana <Icon name="external" size={13}/></a></div></li>)}</ul> : feed === null ? null : <p className="subtle-notice live-feed-resting"><Icon name="spark" size={15}/> The live feed is resting. New badges appear here the moment Solana confirms them.</p>}</section>
-    {openings.length > 0 && <section className="events-section openings-section"><div className="section-heading"><div><span className="eyebrow">YOUR TRACK RECORD, PUT TO WORK</span><h2>Open right now.</h2></div><Link className="text-link" href="/profile/me">View my track record <Icon name="arrow" size={16}/></Link></div><div className="event-grid">{openings.map((o, i) => <Link href={`/openings/${o.id}`} className="event-card" key={o.id} style={{"--card-i": i} as React.CSSProperties}><div className="event-card-top"><Badge>{o.clubName}</Badge><span className="quiet-pill"><Icon name="calendar" size={12}/> {o.closesAt && clientNow ? `Open until ${formatClosingDay(o.closesAt)}` : "Open"}</span></div><h3>{o.title}</h3><p>{ruleSentence(o.role, o.minCount)}</p><div className="event-card-bottom"><span>Checked against your badges on Solana</span><span className="event-card-proof">See if you qualify <Icon name="arrow" size={15}/></span></div></Link>)}</div></section>}
-    <section className="closing"><span className="little-mark">↗</span><div><h2>Presence has its perks.</h2><p>One event gets you started. Coming back makes you a regular.</p></div><Link href="/profile/me" className="button secondary">Explore your membership <Icon name="arrow" size={16}/></Link></section>
+  <main className="shell home2">
+    <section className="home2-hero">
+      <div className="home2-copy">
+        <span className="home2-pill"><i/> Proof of showing up, on Solana</span>
+        <h1>Every time you show up,<br/><span>it adds up.</span></h1>
+        <p>Clubs hand out badges for showing up, mentoring and speaking. You keep them in your own track record and take it to the next club. No fees, no crypto know-how needed.</p>
+        <div className="home2-actions">
+          <Link className="button primary" href="/profile/me">See my track record <Icon name="arrow" size={16}/></Link>
+          <Link className="button secondary" href="/organizer">Run a club <Icon name="arrow" size={16}/></Link>
+        </div>
+        {todayEvent && <a className="home2-today" href={explorerLink(todayEvent.mint)} target="_blank" rel="noreferrer"><span className="home2-live"/> Checking in today: <strong>{todayEvent.name}</strong> · {formatEventDetail(todayEvent.date, todayEvent.location, clientNow ?? undefined)}</a>}
+      </div>
+      <div className="home2-card" aria-hidden="true">
+        <div className="home2-card-top"><span>Track record</span><span><Icon name="shield" size={12}/> Verified on Solana</span></div>
+        <strong className="home2-card-tier">Regular</strong>
+        <span className="home2-card-wallet">Fq3b…NwRy</span>
+        <div className="home2-card-bar"><i style={{width: "80%"}}/></div>
+        <div className="home2-card-meta"><span>4 of 5 events</span><span>1 more to Core Member</span></div>
+        <div className="home2-card-pills"><span className="rec-pill rec-role-Mentor">1 × Mentor</span><span className="rec-pill rec-role-Speaker">1 × Speaker</span><span className="rec-pill">4 events</span></div>
+      </div>
+    </section>
+
+    <section className="home2-grid">
+      <div className="home2-panel">
+        <div className="home2-panel-head"><h2>Live across clubs</h2><span className="home2-src"><span className="home2-live"/> Solana · QuickNode Streams</span></div>
+        {feed && feed.items.length > 0
+          ? <ul className="home2-feed">{feed.items.map((item) => <li key={item.signature}>
+              <span className={`home2-feed-ic${item.kind === "contribution" ? " is-role" : ""}`}><Icon name={item.kind === "contribution" ? "spark" : "check"} size={15}/></span>
+              <div><strong>{item.role ?? "Attended"} <span>· {item.club}</span></strong><small>{item.eventName} · {item.wallet}</small></div>
+              <a href={explorerLink(item.signature, "tx")} target="_blank" rel="noreferrer" aria-label="View on Solana">{timeAgo(item.at, feed.now)} <Icon name="external" size={12}/></a>
+            </li>)}</ul>
+          : <p className="home2-empty">{feed === null ? "Loading the live feed…" : "Quiet right now. New badges appear here the moment Solana confirms them."}</p>}
+      </div>
+      <div className="home2-panel">
+        <div className="home2-panel-head"><h2>Open right now</h2><span className="home2-src">Checked against your badges</span></div>
+        {openings.length > 0
+          ? <ul className="home2-openings">{openings.map((o) => <li key={o.id}><Link href={`/openings/${o.id}`}>
+              <div><strong>{o.title}</strong><small>{o.clubName} · {ruleSentence(o.role, o.minCount)}</small></div>
+              <span>{o.closesAt && clientNow ? `Until ${formatClosingDay(o.closesAt)}` : "Open"} <Icon name="arrow" size={14}/></span>
+            </Link></li>)}</ul>
+          : <p className="home2-empty">No openings yet. Clubs post them when they need mentors, speakers or volunteers.</p>}
+      </div>
+    </section>
   </main><SiteFooter /></>;
 }
