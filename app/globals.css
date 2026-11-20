@@ -726,3 +726,31 @@ body:has(.profile-record) { background: #f7f8fa; }
 .dash-small{padding:7px 12px;font-size:13px;gap:6px;min-height:36px}
 .dash-rail{gap:4px}
 @media (max-width:720px){.dash-rail{overflow-x:auto;justify-content:flex-start;scrollbar-width:none}.dash-rail::-webkit-scrollbar{display:none}.dash-rail button{flex-shrink:0}.dash-rail-end{display:none}}
+
+/* Dashboard Overview tab (2026-11-20): next event and term numbers on top, members and activity below. */
+.ov{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:stretch}
+.ov-label{display:block;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#8a938d}
+.ov-next{border-radius:20px;padding:20px 22px;color:#eef6f1;background:radial-gradient(120% 90% at 100% 0%,#2f8a5f 0%,transparent 55%),linear-gradient(160deg,#1c5a3d,#103826);box-shadow:0 18px 40px -18px rgba(16,56,38,.55);display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.ov-next .ov-label{color:#b9d8c6}
+.ov-next h2{font-size:26px;font-weight:700;letter-spacing:-.03em;color:#fff;margin-top:4px}
+.ov-next p{font-size:14px;color:#cfe3d6;margin-bottom:10px}
+.ov-next .button.primary{background:#fff;color:#0f4f34;padding:11px 18px;font-size:14px;font-weight:600;gap:8px;box-shadow:0 6px 16px rgba(0,0,0,.18)}
+.ov-next .button.primary:hover{background:#f1f7f3}
+.ov-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 16px;align-content:start;border-radius:20px;padding:20px 22px;background:rgba(255,255,255,.8);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.95);box-shadow:0 6px 24px rgba(20,40,30,.06)}
+.ov-stats .ov-label{grid-column:1/-1}
+.ov-stats div{display:flex;flex-direction:column}
+.ov-stats strong{font-size:30px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:#141a16;line-height:1.1}
+.ov-stats div span{font-size:13px;color:#5f6862}
+.ov-card{border-radius:20px;padding:6px 20px 14px;background:rgba(255,255,255,.8);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.95);box-shadow:0 6px 24px rgba(20,40,30,.06);display:flex;flex-direction:column}
+.ov-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0 6px}
+.ov-card-head h3{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px}
+.ov-card-head .dash-open{background:transparent;min-height:36px}
+.ov-list{list-style:none;margin:0;padding:0}
+.ov-list li{display:flex;align-items:center;gap:12px;min-height:54px;border-top:1px solid #eef0ed}
+.ov-who{flex:1;min-width:0;display:flex;flex-direction:column}
+.ov-who strong{font-size:14.5px;font-weight:600}
+.ov-who small{font-size:12.5px;color:#7a847c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov-time{font-size:12.5px;color:#7a847c;white-space:nowrap}
+.ov-empty{font-size:14px;color:#5f6862;padding:12px 0;border-top:1px solid #eef0ed}
+.ov-pending{align-self:flex-start;margin-top:10px}
+@media (max-width:860px){.ov{grid-template-columns:1fr}}

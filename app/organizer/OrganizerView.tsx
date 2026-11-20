@@ -96,14 +96,14 @@ export default function OrganizerView() {
 
   // Which part of the dashboard is open: the club's events, its openings, or (registry admin
   // only) the list of clubs.
-  const [tab, setTab] = useState<"events" | "badges" | "members" | "openings" | "activity" | "clubs">("events");
+  const [tab, setTab] = useState<"overview" | "events" | "badges" | "members" | "openings" | "activity" | "clubs">("overview");
 
   // Members tab: everyone holding one of this club's badges, most active first.
   type RosterEntry = { wallet: string; name: string; attended: number; roles: Record<string, number> };
   const [roster, setRoster] = useState<RosterEntry[] | null>(null);
   const [rosterError, setRosterError] = useState(false);
   useEffect(() => {
-    if (tab !== "members" || !session) return;
+    if ((tab !== "members" && tab !== "overview") || !session) return;
     let cancelled = false;
     setRosterError(false);
     fetch(`/api/clubs/${session.clubId}/roster`, { cache: "no-store", headers: clubHeaders(session) })
@@ -117,7 +117,7 @@ export default function OrganizerView() {
   // every 15 s while the tab is open.
   const [activity, setActivity] = useState<{ items: FeedItem[]; stream: string; now: Date } | null>(null);
   useEffect(() => {
-    if (tab !== "activity") return;
+    if (tab !== "activity" && tab !== "overview") return;
     let cancelled = false;
     const load = () => fetch("/api/feed", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -171,7 +171,7 @@ export default function OrganizerView() {
   }
 
   function lock() {
-    setTab("events");
+    setTab("overview");
     saveSession(null);
     setSession(null);
     setClub(null);
@@ -258,6 +258,12 @@ export default function OrganizerView() {
     return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", close); };
   }, [menuFor]);
   const term = termOf(today)?.label;
+  // This term's numbers for the Overview tab (Fall = Sep–Dec, as on the track record).
+  const inTerm = (e: EventItem) => !!term && termOf(e.date)?.label === term;
+  const termEvents = hosted.filter(inTerm);
+  const termCheckins = termEvents.length > 0 && termEvents.every((e) => e.attendees !== undefined)
+    ? termEvents.reduce((n, e) => n + (e.attendees ?? 0), 0) : termEvents.length === 0 ? 0 : null;
+  const termBadges = roleBadges.filter(inTerm).reduce((n, e) => n + (e.attendees ?? 0), 0);
 
   function openAccess() { setOpenCreateAfterAccess(false); setAccessError(""); setAccessModal(true); }
 
@@ -292,6 +298,7 @@ export default function OrganizerView() {
   return <><SiteHeader view="organizer" />
   <main className="dash">
     <nav className="dash-rail" aria-label="Club dashboard">
+      <button type="button" className={tab === "overview" ? "on" : ""} onClick={() => setTab("overview")} disabled={!session} aria-current={tab === "overview" ? "page" : undefined}><Icon name="home" size={19}/><span>Overview</span></button>
       <button type="button" className={tab === "events" ? "on" : ""} onClick={() => setTab("events")} aria-current={tab === "events" ? "page" : undefined}><Icon name="calendar" size={19}/><span>Events</span></button>
       <button type="button" className={tab === "badges" ? "on" : ""} onClick={() => setTab("badges")} disabled={!session} aria-current={tab === "badges" ? "page" : undefined}><Icon name="spark" size={19}/><span>Badges</span></button>
       <button type="button" className={tab === "members" ? "on" : ""} onClick={() => setTab("members")} disabled={!session} aria-current={tab === "members" ? "page" : undefined}><Icon name="people" size={19}/><span>Members</span></button>
@@ -308,7 +315,7 @@ export default function OrganizerView() {
           {session && <p>{club?.verified !== false && <span className="dash-verified"><Icon name="shield" size={13}/> Verified issuer</span>}{term && <span>{term}</span>}<button className="dash-lock" onClick={lock}>Lock</button></p>}
         </div>
         <span className="dash-spacer"/>
-        {session && (tab === "events" || tab === "badges") && <>
+        {session && (tab === "overview" || tab === "events" || tab === "badges") && <>
           <button className="button secondary" onClick={() => setAward(null)}><Icon name="spark" size={16}/> Award a badge</button>
           <button className="button primary" onClick={openCreate}><Icon name="plus" size={16}/> New event</button>
         </>}
@@ -332,6 +339,51 @@ export default function OrganizerView() {
         {upcoming.length > 0 && <><h2 className="dash-h">Next</h2><ul className="dash-list">{upcoming.map((e, i) => eventRow(e, i === 0))}</ul></>}
         {past.length > 0 && <><h2 className="dash-h">Past</h2><ul className="dash-list">{past.map((e) => eventRow(e))}</ul></>}
       </>}
+
+      {session && tab === "overview" && <div className="ov">
+        <section className="ov-next">
+          <span className="ov-label">Next event</span>
+          {events === null ? <div className="skeleton" style={{height: 22, width: "60%", marginTop: 8}}/>
+            : upcoming[0] ? <>
+              <h2>{upcoming[0].name}</h2>
+              <p>{formatDay(upcoming[0].date)}{upcoming[0].location && <> · {upcoming[0].location}</>}</p>
+              <Link className="button primary" href={`/organizer/${upcoming[0].id}`}>Start check-in <Icon name="arrow" size={15}/></Link>
+            </> : <>
+              <h2>Nothing scheduled</h2>
+              <p>Create your next event to get a check-in QR code.</p>
+              <button className="button primary" onClick={openCreate}><Icon name="plus" size={15}/> New event</button>
+            </>}
+        </section>
+        <section className="ov-stats" aria-label={`This term${term ? `, ${term}` : ""}`}>
+          <span className="ov-label">{term ?? "This term"}</span>
+          <div><strong>{events === null ? "–" : termEvents.length}</strong><span>{termEvents.length === 1 ? "event" : "events"}</span></div>
+          <div><strong>{termCheckins ?? "–"}</strong><span>check-ins</span></div>
+          <div><strong>{events === null ? "–" : termBadges}</strong><span>{termBadges === 1 ? "role badge" : "role badges"}</span></div>
+          <div><strong>{roster === null ? "–" : roster.length}</strong><span>{roster?.length === 1 ? "member" : "members"}</span></div>
+        </section>
+        <section className="ov-card">
+          <div className="ov-card-head"><h3>Top members</h3><button type="button" className="dash-open" onClick={() => setTab("members")}>All members <Icon name="arrow" size={14}/></button></div>
+          {roster === null ? <div className="skeleton" style={{height: 14, width: "50%", margin: "12px 0"}}/>
+            : roster.length === 0 ? <p className="ov-empty">{rosterError ? "Couldn’t load members." : "Members appear after their first check-in."}</p>
+            : <ol className="ov-list">{roster.slice(0, 3).map((m, i) => <li key={m.wallet}>
+                <span className="dash-rank">{i + 1}</span>
+                <span className="dash-av" aria-hidden="true">{Array.from(m.name)[0]?.toUpperCase()}</span>
+                <span className="ov-who"><strong>{m.name}</strong><small>{getTier(m.attended)?.name ?? "No tier yet"}{Object.keys(m.roles).length > 0 && ` · ${Object.keys(m.roles).join(", ")}`}</small></span>
+                <span className="dash-num">{m.attended}<small>{m.attended === 1 ? " event" : " events"}</small></span>
+              </li>)}</ol>}
+        </section>
+        <section className="ov-card">
+          <div className="ov-card-head"><h3><span className="ci-live">Live</span> Latest activity</h3><button type="button" className="dash-open" onClick={() => setTab("activity")}>All activity <Icon name="arrow" size={14}/></button></div>
+          {clubActivity === null ? <div className="skeleton" style={{height: 14, width: "50%", margin: "12px 0"}}/>
+            : clubActivity.length === 0 ? <p className="ov-empty">{activity?.stream === "off" ? "The live stream isn’t connected right now." : "Nothing new yet."}</p>
+            : <ul className="ov-list">{clubActivity.slice(0, 3).map((item) => <li key={item.signature}>
+                <span className={`home2-feed-ic${item.kind === "contribution" ? " is-role" : ""}`}><Icon name={item.kind === "contribution" ? "spark" : "check"} size={14}/></span>
+                <span className="ov-who"><strong>{item.role ?? "Checked in"}</strong><small>{item.eventName} · {item.wallet}</small></span>
+                <small className="ov-time">{activity ? timeAgo(item.at, activity.now) : ""}</small>
+              </li>)}</ul>}
+          {pending > 0 && <button type="button" className="dash-pending ov-pending" onClick={() => setTab("openings")}>{pending} {pending === 1 ? "application" : "applications"} waiting for a decision →</button>}
+        </section>
+      </div>}
 
       {session && tab === "badges" && <>
         <p className="dash-lede">Role badges your club gave for what people did: mentoring, speaking, volunteering. Each one is on the person’s track record.</p>
